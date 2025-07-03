@@ -1,0 +1,371 @@
+# Vue.js 親子コンポーネント - 新人エンジニア向け解説
+
+## 🏠 基本概念：親子関係とは？
+
+Vue.jsのコンポーネントは「家族」のような関係を持ちます。
+
+```
+親コンポーネント (Parent)
+├── 子コンポーネント1 (Child1)  
+├── 子コンポーネント2 (Child2)
+└── 子コンポーネント3 (Child3)
+```
+
+## 📤 親から子へ：Props（プロパティ）
+
+### 基本的な使い方
+
+**親コンポーネント (Parent.vue)**
+```vue
+<template>
+  <div>
+    <h1>保険シミュレーション</h1>
+    <!-- 子コンポーネントにデータを渡す -->
+    <UserInfo 
+      :name="userName" 
+      :age="userAge"
+      :gender="userGender"
+    />
+  </div>
+</template>
+
+<script>
+import UserInfo from './UserInfo.vue'
+
+export default {
+  components: {
+    UserInfo
+  },
+  data() {
+    return {
+      userName: '田中太郎',
+      userAge: 30,
+      userGender: '男性'
+    }
+  }
+}
+</script>
+```
+
+**子コンポーネント (UserInfo.vue)**
+```vue
+<template>
+  <div class="user-info">
+    <p>お名前: {{ name }}</p>
+    <p>年齢: {{ age }}歳</p>
+    <p>性別: {{ gender }}</p>
+  </div>
+</template>
+
+<script>
+export default {
+  // 親から受け取るデータを定義
+  props: {
+    name: String,
+    age: Number,
+    gender: String
+  }
+}
+</script>
+```
+
+### Props の型指定（推奨）
+
+```javascript
+// 基本的な型指定
+props: {
+  name: String,
+  age: Number,
+  isActive: Boolean,
+  options: Array,
+  config: Object
+}
+
+// 詳細な指定（本格的）
+props: {
+  name: {
+    type: String,
+    required: true,  // 必須
+    default: '名無し'
+  },
+  age: {
+    type: Number,
+    validator(value) {
+      return value >= 0 && value <= 120
+    }
+  }
+}
+```
+
+## 📥 子から親へ：Events（イベント）
+
+### 基本的な使い方
+
+**子コンポーネント (CalculatorForm.vue)**
+```vue
+<template>
+  <div>
+    <select v-model="selectedAmount" @change="notifyParent">
+      <option value="5000">5,000円</option>
+      <option value="10000">10,000円</option>
+    </select>
+    
+    <button @click="calculate">保険料計算</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      selectedAmount: 5000
+    }
+  },
+  methods: {
+    notifyParent() {
+      // 親に変更を通知
+      this.$emit('amount-changed', this.selectedAmount)
+    },
+    
+    calculate() {
+      const result = this.selectedAmount * 12 // 年額計算
+      // 親に結果を送信
+      this.$emit('calculation-done', {
+        amount: this.selectedAmount,
+        yearlyTotal: result
+      })
+    }
+  }
+}
+</script>
+```
+
+**親コンポーネント (InsuranceSimulator.vue)**
+```vue
+<template>
+  <div>
+    <h1>保険料シミュレーター</h1>
+    
+    <!-- 子コンポーネントのイベントを受け取る -->
+    <CalculatorForm 
+      @amount-changed="handleAmountChange"
+      @calculation-done="handleCalculationResult"
+    />
+    
+    <p v-if="currentAmount">現在の選択: {{ currentAmount }}円</p>
+    <p v-if="yearlyAmount">年間保険料: {{ yearlyAmount }}円</p>
+  </div>
+</template>
+
+<script>
+import CalculatorForm from './CalculatorForm.vue'
+
+export default {
+  components: {
+    CalculatorForm
+  },
+  data() {
+    return {
+      currentAmount: 0,
+      yearlyAmount: 0
+    }
+  },
+  methods: {
+    handleAmountChange(newAmount) {
+      this.currentAmount = newAmount
+      console.log('金額が変更されました:', newAmount)
+    },
+    
+    handleCalculationResult(result) {
+      this.currentAmount = result.amount
+      this.yearlyAmount = result.yearlyTotal
+      console.log('計算完了:', result)
+    }
+  }
+}
+</script>
+```
+
+## 🔄 実践例：保険フォームの親子構造
+
+### 実際のプロジェクト例
+
+**親コンポーネント (ProductDetailSumame.vue)**
+```vue
+<template>
+  <div class="insurance-form">
+    <!-- 基本情報入力 -->
+    <BasicInfo 
+      :application="application"
+      @user-info-updated="updateUserInfo"
+    />
+    
+    <!-- 保険プラン選択 -->
+    <PlanSelector
+      :available-plans="availablePlans"
+      :selected-plan="selectedPlan"
+      @plan-changed="handlePlanChange"
+    />
+    
+    <!-- 保険料表示 -->
+    <PremiumDisplay
+      :premium="calculatedPremium"
+      :breakdown="premiumBreakdown"
+    />
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      application: {
+        name: '',
+        age: 0,
+        gender: ''
+      },
+      selectedPlan: null,
+      calculatedPremium: 0,
+      premiumBreakdown: []
+    }
+  },
+  
+  methods: {
+    updateUserInfo(userInfo) {
+      this.application = { ...this.application, ...userInfo }
+      this.recalculatePremium()
+    },
+    
+    handlePlanChange(newPlan) {
+      this.selectedPlan = newPlan
+      this.recalculatePremium()
+    },
+    
+    recalculatePremium() {
+      // 保険料の再計算ロジック
+      if (this.selectedPlan && this.application.age) {
+        this.calculatedPremium = this.calculatePremium()
+      }
+    }
+  }
+}
+</script>
+```
+
+## 🚨 よくある間違いと解決策
+
+### ❌ 間違い1: Props を直接変更する
+
+```javascript
+// ダメな例
+props: ['value'],
+methods: {
+  updateValue() {
+    this.value = 'new value' // エラー！Propsは読み取り専用
+  }
+}
+```
+
+```javascript
+// 正しい例
+props: ['value'],
+data() {
+  return {
+    localValue: this.value // ローカルコピーを作る
+  }
+},
+methods: {
+  updateValue() {
+    this.localValue = 'new value'
+    this.$emit('input', this.localValue) // 親に通知
+  }
+}
+```
+
+### ❌ 間違い2: イベント名の命名規則
+
+```javascript
+// ダメな例
+this.$emit('updateData', data) // キャメルケース
+
+// 良い例  
+this.$emit('update-data', data) // ケバブケース
+```
+
+### ❌ 間違い3: 深いオブジェクトの変更
+
+```javascript
+// 注意が必要な例
+props: ['config'],
+methods: {
+  updateConfig() {
+    // オブジェクトの中身を変更（参照は同じ）
+    this.config.name = 'new name' // 動くが推奨されない
+  }
+}
+```
+
+```javascript
+// 推奨される方法
+methods: {
+  updateConfig() {
+    const newConfig = { ...this.config, name: 'new name' }
+    this.$emit('config-updated', newConfig)
+  }
+}
+```
+
+## 🛠️ 実際のテストでの親子関係
+
+テストコードでよく見る親子のやり取り：
+
+```javascript
+// テストでの親子コンポーネントの検証
+it('親から子にpropsが正しく渡される', () => {
+  const wrapper = mount(ParentComponent, {
+    propsData: {
+      application: getApplication(),
+      constants: getConstants()
+    }
+  })
+  
+  // 子コンポーネントが存在することを確認
+  const childComponent = wrapper.findComponent(ChildComponent)
+  expect(childComponent.exists()).toBe(true)
+  
+  // 子コンポーネントがpropsを受け取っていることを確認
+  expect(childComponent.props('application')).toEqual(getApplication())
+})
+
+it('子から親にイベントが発行される', async () => {
+  const wrapper = mount(ChildComponent)
+  
+  // 子コンポーネントのボタンをクリック
+  await wrapper.find('button').trigger('click')
+  
+  // イベントが発行されたことを確認
+  expect(wrapper.emitted('button-clicked')).toBeTruthy()
+  expect(wrapper.emitted('button-clicked')[0]).toEqual(['clicked'])
+})
+```
+
+## 📚 まとめ
+
+### 基本ルール
+1. **親 → 子**: Props を使ってデータを渡す
+2. **子 → 親**: Events を使って変更を通知
+3. **Props は読み取り専用**: 直接変更してはいけない
+4. **イベント名はケバブケース**: `user-updated` など
+
+### 覚えておくこと
+- Props：データを下に流す
+- Events：変更を上に伝える  
+- 単方向データフロー：データは親から子へ一方通行
+- 責任分離：各コンポーネントは自分の役割に集中
+
+### 次のステップ
+- Vuex/Pinia（状態管理）
+- Provide/Inject（深い階層でのデータ共有）
+- Composition API（Vue 3の新しい書き方）
+
+この基本をマスターすれば、Vue.jsアプリケーションの構造が理解できるようになります！
