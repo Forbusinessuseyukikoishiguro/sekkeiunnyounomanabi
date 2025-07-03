@@ -1,0 +1,441 @@
+実装モック特化で新人エンジニア向けに解説します！実際にテストを書く時に使えるパターンを中心に説明しますね。
+
+## 🎯 **モックとは何か？（3秒で理解）**
+
+```javascript
+// ❌ 実際のAPI呼び出し（テストで困る）
+const result = await fetch('/api/insurance-rate')
+
+// ✅ モック（偽物のAPI）
+const mockFetch = jest.fn().mockResolvedValue({ rate: 1000 })
+```
+
+**モック = 偽物だけど、テストに必要な最低限の機能を持つもの**
+
+---
+
+## 🛠️ **基本的なモック実装パターン**
+
+### **Pattern 1: 単純な関数モック**
+
+```javascript
+// ❌ 初心者がやりがちな間違い
+const wrapper = mount(Component)
+wrapper.vm.calcAmount() // 実際の計算が実行されてしまう
+
+// ✅ 正しいモック実装
+const wrapper = mount(Component)
+wrapper.vm.calcAmount = jest.fn() // モック化
+wrapper.vm.calcAmount() // 実行されるが、実際の処理はしない
+
+// 検証
+expect(wrapper.vm.calcAmount).toHaveBeenCalled() // 呼ばれたかチェック
+```
+
+### **Pattern 2: 戻り値付きモック**
+
+```javascript
+// 実装例：保険料計算のモック
+describe('保険料計算テスト', () => {
+  it('プラン変更時に保険料が更新される', async () => {
+    const wrapper = mount(ProductDetailSumameRabbit, {
+      propsData: { /* テストデータ */ }
+    })
+    
+    // ✅ 計算メソッドをモック化して戻り値を固定
+    wrapper.vm.calcAmount = jest.fn().mockReturnValue(1500)
+    
+    // プラン変更をシミュレート
+    wrapper.find('select[name="product_09_01"]').setValue('3')
+    await wrapper.vm.$nextTick()
+    
+    // モックが呼ばれたことを確認
+    expect(wrapper.vm.calcAmount).toHaveBeenCalled()
+  })
+})
+```
+
+---
+
+## 🗃️ **Vuexストアのモック（超重要）**
+
+### **Pattern 3: ストアモックの基本**
+
+```javascript
+// ❌ 実際のVuexストアを使う（複雑で壊れやすい）
+import store from '@/store'
+const wrapper = mount(Component, { store })
+
+// ✅ モックストアを使う（シンプルで安定）
+const mockStore = {
+  getters: {
+    'user/isLoggedIn': jest.fn().mockReturnValue(true),
+    'simulation/situation': jest.fn().mockReturnValue({
+      sumameRabbit: {
+        plan: 3,
+        payMethodTimesCode: "01"
+      }
+    })
+  },
+  dispatch: jest.fn(),
+  commit: jest.fn()
+}
+
+const wrapper = mount(Component, {
+  mocks: { $store: mockStore }
+})
+```
+
+### **Pattern 4: getters の動的変更**
+
+```javascript
+it('ログイン状態によって表示が変わる', async () => {
+  const mockStore = {
+    getters: {
+      'user/isLoggedIn': jest.fn()
+    }
+  }
+  
+  const wrapper = mount(Component, {
+    mocks: { $store: mockStore }
+  })
+  
+  // ✅ テスト途中でgetterの戻り値を変更
+  mockStore.getters['user/isLoggedIn'].mockReturnValue(true)
+  await wrapper.vm.$nextTick()
+  expect(wrapper.find('.login-info').exists()).toBe(true)
+  
+  mockStore.getters['user/isLoggedIn'].mockReturnValue(false)
+  await wrapper.vm.$nextTick()
+  expect(wrapper.find('.login-info').exists()).toBe(false)
+})
+```
+
+---
+
+## 📅 **日付・時間のモック（実用的）**
+
+### **Pattern 5: 日付固定パターン**
+
+```javascript
+describe('年齢制限テスト', () => {
+  let mockDate
+  
+  beforeEach(() => {
+    // ✅ 日付を2019/10/1に固定
+    const fixedDate = new Date(2019, 9, 1) // 10月は9（0ベース）
+    mockDate = jest.spyOn(global, 'Date').mockImplementation(() => fixedDate)
+  })
+  
+  afterEach(() => {
+    // ✅ 必ずクリーンアップ
+    mockDate.mockRestore()
+  })
+  
+  it('20歳の場合、全ての特約が表示される', () => {
+    const application = {
+      birthDate: '1999-1-1', // 20歳
+      fullAge: 20
+    }
+    
+    const wrapper = mount(ProductDetailSumameRabbit, {
+      propsData: { application }
+    })
+    
+    expect(wrapper.find('select[name="product_09_07"]').exists()).toBe(true)
+  })
+})
+```
+
+### **Pattern 6: 時間をコントロールするモック**
+
+```javascript
+// 実装例：時間経過のテスト
+it('5秒後にタイムアウトメッセージが表示される', async () => {
+  jest.useFakeTimers() // ✅ 偽のタイマーを使用
+  
+  const wrapper = mount(TimeoutComponent)
+  
+  // 5秒進める
+  jest.advanceTimersByTime(5000)
+  await wrapper.vm.$nextTick()
+  
+  expect(wrapper.find('.timeout-message').exists()).toBe(true)
+  
+  jest.useRealTimers() // ✅ 元に戻す
+})
+```
+
+---
+
+## 🌐 **DOM要素のモック**
+
+### **Pattern 7: getElementById のモック**
+
+```javascript
+describe('アコーディオン機能', () => {
+  beforeEach(() => {
+    // ✅ DOM要素を偽物で用意
+    const mockElements = {
+      sumameRabbitAccordionTarget: {
+        style: { height: '0px' }
+      },
+      sumameRabbitAccordionBody: {
+        clientHeight: 150
+      }
+    }
+    
+    // document.getElementById をモック化
+    jest.spyOn(document, 'getElementById')
+        .mockImplementation((id) => mockElements[id])
+  })
+  
+  it('アコーディオンの高さが正しく設定される', () => {
+    const wrapper = mount(ProductDetailSumameRabbit)
+    wrapper.vm.adjustAccordionHeight()
+    
+    // モックされた要素の高さが変更されたかチェック
+    const target = document.getElementById('sumameRabbitAccordionTarget')
+    expect(target.style.height).toBe('150px')
+  })
+})
+```
+
+---
+
+## 🔄 **API呼び出しのモック**
+
+### **Pattern 8: 非同期処理のモック**
+
+```javascript
+// ✅ API呼び出しをモック化
+global.fetch = jest.fn()
+
+describe('保険料API呼び出し', () => {
+  beforeEach(() => {
+    fetch.mockClear() // 前のテストの影響を除去
+  })
+  
+  it('正常なレスポンスの場合', async () => {
+    // ✅ 成功レスポンスをモック
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ premium: 1500 })
+    })
+    
+    const wrapper = mount(Component)
+    await wrapper.vm.fetchPremium()
+    
+    expect(fetch).toHaveBeenCalledWith('/api/premium', expect.any(Object))
+    expect(wrapper.vm.premium).toBe(1500)
+  })
+  
+  it('エラーレスポンスの場合', async () => {
+    // ✅ エラーレスポンスをモック
+    fetch.mockRejectedValueOnce(new Error('API Error'))
+    
+    const wrapper = mount(Component)
+    await wrapper.vm.fetchPremium()
+    
+    expect(wrapper.find('.error-message').exists()).toBe(true)
+  })
+})
+```
+
+---
+
+## 🎨 **Vue.js特有のモックパターン**
+
+### **Pattern 9: 子コンポーネントのモック**
+
+```javascript
+// ✅ 重いコンポーネントをモック化
+const MockModal = {
+  name: 'Modal',
+  template: '<div class="mock-modal"><slot /></div>',
+  props: ['visible'],
+  methods: {
+    close: jest.fn()
+  }
+}
+
+describe('モーダル表示テスト', () => {
+  it('ヘルプボタンでモーダルが開く', async () => {
+    const wrapper = mount(ProductDetailSumameRabbit, {
+      components: {
+        Modal: MockModal // ✅ 実際のModalコンポーネントを置き換え
+      }
+    })
+    
+    await wrapper.find('.qa71').trigger('click')
+    await wrapper.vm.$nextTick()
+    
+    expect(wrapper.find('.mock-modal').exists()).toBe(true)
+  })
+})
+```
+
+### **Pattern 10: プロパティのモック**
+
+```javascript
+it('プロパティが正しく渡される', () => {
+  // ✅ テスト用のプロパティを準備
+  const mockProps = {
+    application: {
+      fullAge: 25,
+      gender: 2,
+      insuranceRates: [
+        { insuranceCd: '206', amount60: 1000 }
+      ]
+    },
+    constants: {
+      NO_DIVIDEND_DISPLAY_PRICE: 50000
+    },
+    applicationValues: {
+      sumameRabbit: 0
+    }
+  }
+  
+  const wrapper = mount(ProductDetailSumameRabbit, {
+    propsData: mockProps
+  })
+  
+  expect(wrapper.vm.application.fullAge).toBe(25)
+})
+```
+
+---
+
+## 🔍 **モック検証のベストプラクティス**
+
+### **Pattern 11: 呼び出し回数の検証**
+
+```javascript
+it('プラン変更時に計算が1回だけ実行される', async () => {
+  const wrapper = mount(Component)
+  const calcSpy = jest.spyOn(wrapper.vm, 'calcAmount')
+  
+  // プランを変更
+  await wrapper.find('select').setValue('3')
+  
+  // ✅ 1回だけ呼ばれることを確認
+  expect(calcSpy).toHaveBeenCalledTimes(1)
+  
+  calcSpy.mockRestore()
+})
+```
+
+### **Pattern 12: 引数の検証**
+
+```javascript
+it('正しい引数でメソッドが呼ばれる', () => {
+  const wrapper = mount(Component)
+  const mockMethod = jest.fn()
+  wrapper.vm.updateOption = mockMethod
+  
+  wrapper.vm.changePolicy('cancer', 1000)
+  
+  // ✅ 引数が正しいかチェック
+  expect(mockMethod).toHaveBeenCalledWith('cancer', 1000)
+})
+```
+
+---
+
+## 🚀 **実践的なモックテンプレート**
+
+### **完全なテストファイルの例**
+
+```javascript
+import { mount } from '@vue/test-utils'
+import ProductDetail from '@/components/ProductDetail.vue'
+
+describe('ProductDetail.vue', () => {
+  let wrapper
+  let mockProps
+  
+  // ✅ 共通のセットアップ
+  beforeEach(() => {
+    // プロパティのモック
+    mockProps = {
+      application: {
+        fullAge: 30,
+        gender: 2,
+        insuranceRates: []
+      }
+    }
+    
+    // DOM要素のモック
+    const mockElements = {
+      accordionTarget: { style: { height: '0px' } },
+      accordionBody: { clientHeight: 100 }
+    }
+    jest.spyOn(document, 'getElementById')
+        .mockImplementation(id => mockElements[id])
+    
+    // 日付のモック
+    jest.spyOn(Date, 'now').mockReturnValue(1577836800000) // 2020/1/1
+  })
+  
+  // ✅ 各テスト後のクリーンアップ
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.destroy()
+    }
+    jest.restoreAllMocks()
+  })
+  
+  it('基本的な表示テスト', () => {
+    wrapper = mount(ProductDetail, {
+      propsData: mockProps
+    })
+    
+    expect(wrapper.find('.main-contract').text()).toBe('基本保障')
+  })
+  
+  it('プラン変更テスト', async () => {
+    wrapper = mount(ProductDetail, {
+      propsData: mockProps
+    })
+    
+    // メソッドをモック化
+    const calcSpy = jest.spyOn(wrapper.vm, 'calcAmount')
+    
+    await wrapper.find('select').setValue('3')
+    await wrapper.vm.$nextTick()
+    
+    expect(calcSpy).toHaveBeenCalled()
+  })
+})
+```
+
+---
+
+## 📝 **モック実装チェックリスト**
+
+### **✅ やるべきこと**
+- [ ] 外部依存（API、DOM）は必ずモック化
+- [ ] 各テスト後にモックをクリア
+- [ ] 具体的な戻り値を設定
+- [ ] メソッドの呼び出しを検証
+
+### **❌ やってはいけないこと**
+- [ ] 実際のAPIを呼び出す
+- [ ] モックのクリーンアップを忘れる  
+- [ ] 複雑なモックを作りすぎる
+- [ ] モックの戻り値を曖昧にする
+
+### **🎯 モック実装の成功パターン**
+
+```javascript
+// ✅ シンプルで理解しやすい
+const mockStore = { getters: jest.fn() }
+
+// ✅ 目的が明確
+const calcSpy = jest.spyOn(wrapper.vm, 'calcAmount')
+
+// ✅ 確実にクリーンアップ
+afterEach(() => jest.restoreAllMocks())
+```
+
+このパターンを覚えれば、どんな複雑なコンポーネントでもテストが書けるようになります！実際に手を動かして試してみてください。
