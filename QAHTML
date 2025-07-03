@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA管理表テンプレート</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .controls {
+            background: white;
+            padding: 15px;
+            border-left: 3px solid #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 0 0 10px 10px;
+            overflow-x: auto;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1200px;
+        }
+        
+        th {
+            background: #f8f9fa;
+            color: #495057;
+            font-weight: 600;
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        td {
+            padding: 10px 8px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+            background: white;
+        }
+        
+        td input, td select, td textarea {
+            width: 100%;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 13px;
+        }
+        
+        td textarea {
+            height: 60px;
+            resize: vertical;
+        }
+        
+        .status-pending { background-color: #fff3cd; }
+        .status-in-progress { background-color: #d4edda; }
+        .status-completed { background-color: #d1ecf1; }
+        .status-overdue { background-color: #f8d7da; }
+        
+        .col-no { width: 50px; }
+        .col-issue { width: 200px; }
+        .col-check { width: 150px; }
+        .col-author { width: 100px; }
+        .col-date { width: 110px; }
+        .col-deadline { width: 110px; }
+        .col-response { width: 250px; }
+        .col-respondent { width: 100px; }
+        .col-status { width: 120px; }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .export-note {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .export-note h3 {
+            margin-top: 0;
+            color: #004085;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 QA管理表テンプレート</h1>
+        <p>案件管理・確認事項追跡システム</p>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="addRow()">➕ 新規案件追加</button>
+        <button class="btn" onclick="exportToCSV()">📥 CSV出力</button>
+        <button class="btn btn-success" onclick="updateStats()">📊 統計更新</button>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number" id="total-count">0</div>
+            <div>総案件数</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="pending-count">0</div>
+            <div>未対応</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="progress-count">0</div>
+            <div>対応中</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="completed-count">0</div>
+            <div>完了</div>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table id="qaTable">
+            <thead>
+                <tr>
+                    <th class="col-no">No.</th>
+                    <th class="col-issue">対応案件</th>
+                    <th class="col-check">確認事項</th>
+                    <th class="col-author">記載者</th>
+                    <th class="col-date">起票日</th>
+                    <th class="col-date">完了日</th>
+                    <th class="col-deadline">期日</th>
+                    <th class="col-deadline">デッドライン</th>
+                    <th class="col-response">ご回答</th>
+                    <th class="col-respondent">回答者（敬称略）</th>
+                    <th class="col-status">ステータス</th>
+                </tr>
+            </thead>
+            <tbody id="qaTableBody">
+                <tr>
+                    <td>1</td>
+                    <td><input type="text" placeholder="案件名を入力"></td>
+                    <td><input type="text" placeholder="確認内容を入力"></td>
+                    <td><input type="text" placeholder="記載者名"></td>
+                    <td><input type="date"></td>
+                    <td><input type="date"></td>
+                    <td><input type="date"></td>
+                    <td><input type="date"></td>
+                    <td><textarea placeholder="回答内容を入力"></textarea></td>
+                    <td><input type="text" placeholder="回答者名"></td>
+                    <td>
+                        <select onchange="updateRowStatus(this)">
+                            <option value="pending">未対応</option>
+                            <option value="in-progress">対応中</option>
+                            <option value="completed">完了</option>
+                            <option value="overdue">期限超過</option>
+                        </select>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="export-note">
+        <h3>📝 Excelでの使用方法</h3>
+        <p><strong>このテンプレートをExcelで使用するには：</strong></p>
+        <ol>
+            <li>「CSV出力」ボタンでデータをダウンロード</li>
+            <li>Excelで新規ブックを作成</li>
+            <li>CSVファイルをインポート（データ > 外部データの取り込み）</li>
+            <li>列幅の調整とフォーマットを適用</li>
+            <li>条件付き書式でステータス別に色分け設定</li>
+        </ol>
+        <p><strong>Excelでの活用ポイント：</strong></p>
+        <ul>
+            <li>フィルタ機能で特定のステータスや担当者で絞り込み</li>
+            <li>ピボットテーブルで集計・分析</li>
+            <li>グラフ機能で進捗の可視化</li>
+            <li>データの入力規則で選択肢を制限</li>
+        </ul>
+    </div>
+
+    <script>
+        let rowCounter = 1;
+        
+        function addRow() {
+            rowCounter++;
+            const tbody = document.getElementById('qaTableBody');
+            const newRow = `
+                <tr>
+                    <td>${rowCounter}</td>
+                    <td><input type="text" placeholder="案件名を入力"></td>
+                    <td><input type="text" placeholder="確認内容を入力"></td>
+                    <td><input type="text" placeholder="記載者名"></td>
+                    <td><input type="date"></td>
+                    <td><input type="date"></td>
+                    <td><input type="date"></td>
+                    <td><input type="date"></td>
+                    <td><textarea placeholder="回答内容を入力"></textarea></td>
+                    <td><input type="text" placeholder="回答者名"></td>
+                    <td>
+                        <select onchange="updateRowStatus(this)">
+                            <option value="pending">未対応</option>
+                            <option value="in-progress">対応中</option>
+                            <option value="completed">完了</option>
+                            <option value="overdue">期限超過</option>
+                        </select>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', newRow);
+            updateStats();
+        }
+        
+        function updateRowStatus(select) {
+            const row = select.closest('tr');
+            row.className = `status-${select.value}`;
+            updateStats();
+        }
+        
+        function updateStats() {
+            const rows = document.querySelectorAll('#qaTableBody tr');
+            const stats = {
+                total: rows.length,
+                pending: 0,
+                'in-progress': 0,
+                completed: 0
+            };
+            
+            rows.forEach(row => {
+                const select = row.querySelector('select');
+                if (select) {
+                    const status = select.value;
+                    if (stats.hasOwnProperty(status)) {
+                        stats[status]++;
+                    }
+                }
+            });
+            
+            document.getElementById('total-count').textContent = stats.total;
+            document.getElementById('pending-count').textContent = stats.pending;
+            document.getElementById('progress-count').textContent = stats['in-progress'];
+            document.getElementById('completed-count').textContent = stats.completed;
+        }
+        
+        function exportToCSV() {
+            const table = document.getElementById('qaTable');
+            const rows = table.querySelectorAll('tr');
+            let csvContent = '';
+            
+            // ヘッダー行
+            const headers = Array.from(rows[0].querySelectorAll('th')).map(th => th.textContent);
+            csvContent += headers.join(',') + '\n';
+            
+            // データ行
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const cells = row.querySelectorAll('td');
+                const rowData = [];
+                
+                cells.forEach((cell, index) => {
+                    if (index === 0) {
+                        // No.
+                        rowData.push(cell.textContent);
+                    } else if (index === cells.length - 1) {
+                        // ステータス
+                        const select = cell.querySelector('select');
+                        rowData.push(select ? select.options[select.selectedIndex].text : '');
+                    } else {
+                        // その他の入力フィールド
+                        const input = cell.querySelector('input, textarea');
+                        rowData.push(input ? `"${input.value.replace(/"/g, '""')}"` : '');
+                    }
+                });
+                
+                csvContent += rowData.join(',') + '\n';
+            }
+            
+            // ダウンロード
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `QA管理表_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+        
+        // 初期化
+        updateStats();
+        
+        // 今日の日付を設定
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelector('input[type="date"]').value = today;
+    </script>
+</body>
+</html>
