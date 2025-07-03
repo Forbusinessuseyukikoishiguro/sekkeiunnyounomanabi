@@ -1,0 +1,334 @@
+このVue.jsテストファイルを新人エンジニア向けに解説しますね！ステップバイステップで進めていきます。
+
+## 📚 **Step 1: テストファイルの基本構造**
+
+### 1.1 インポート部分
+```javascript
+import { mount, createLocalVue } from '@vue/test-utils'
+import ProductDetailSumameRabbit from '@/components/ProductDetailSumameRabbit.vue'
+import flushPromises from 'flush-promises'
+```
+
+**解説：**
+- `mount`: Vue コンポーネントをテスト用にマウント（仮想的に表示）する関数
+- `createLocalVue`: テスト用の独立したVueインスタンスを作成
+- `flushPromises`: 非同期処理の完了を待つためのユーティリティ
+
+### 1.2 テストの基本構造
+```javascript
+describe('ProductDetailSumameRabbit.vue', () => {
+  it('ケース 28-1 基本保障：表示（20歳）', async () => {
+    // テストの内容
+  })
+})
+```
+
+**解説：**
+- `describe`: テストのグループ化（テストスイート）
+- `it`: 個別のテストケース
+- `async`: 非同期テストを示すキーワード
+
+---
+
+## 📊 **Step 2: テストデータとモック**
+
+### 2.1 テストデータの準備
+```javascript
+const getApplication = () => {
+  const tmp = {
+    mainTypeCd: '206',
+    message: '__vue_devtool_undefined__',
+    birthDate: '1999-1-1',
+    calcBaseDate: '2019-10-01',
+    fullAge: 20,
+    gender: 2,
+    // ... 大量のデータ
+  }
+  return JSON.parse(JSON.stringify(tmp))
+}
+```
+
+**解説：**
+- テスト用のダミーデータを返す関数
+- `JSON.parse(JSON.stringify())`: オブジェクトの深いコピーを作成
+- 実際のAPIから返ってくるデータ構造を模擬
+
+### 2.2 モック（Mock）の概念
+```javascript
+const $store = {
+  getters: jest.fn()
+}
+```
+
+**解説：**
+- `jest.fn()`: Jest（テストフレームワーク）のモック関数
+- 実際のVuexストアの代わりに使用
+- テスト時に外部依存を排除するため
+
+---
+
+## 🔧 **Step 3: コンポーネントのマウント**
+
+### 3.1 基本的なマウント
+```javascript
+const wrapper = mount(ProductDetailSumameRabbit, {
+  mocks: { $store },
+  propsData: {
+    application: getApplication(),
+    constants: getConstants(),
+    applicationValues: getApplicationValues()
+  }
+})
+```
+
+**解説：**
+- `wrapper`: マウントされたコンポーネントのラッパーオブジェクト
+- `mocks`: 依存関係をモックで置き換え
+- `propsData`: コンポーネントに渡すプロパティ
+
+### 3.2 初期化とライフサイクル
+```javascript
+wrapper.vm.dispPerTimes = jest.fn()
+wrapper.vm.initDataSumameRabbit()
+await wrapper.vm.$nextTick()
+```
+
+**解説：**
+- `wrapper.vm`: Vue インスタンスへの直接アクセス
+- `$nextTick()`: DOM更新の完了を待機
+- `await`: 非同期処理の完了を待つ
+
+---
+
+## 🎯 **Step 4: DOMテストの基本**
+
+### 4.1 要素の存在確認
+```javascript
+expect(wrapper.find('.main-contract').text()).toBe('基本保障')
+```
+
+**解説：**
+- `find()`: CSSセレクタで要素を検索
+- `text()`: 要素のテキスト内容を取得
+- `expect().toBe()`: 期待値との一致を検証
+
+### 4.2 プルダウン（select）のテスト
+```javascript
+const selector = wrapper.find('select[name="product_09_01"]').findAll('option')
+expect(selector.exists()).toBe(true)
+expect(selector.length).toBe(8)
+expect(selector.at(0).element.text).toBe('3,000')
+```
+
+**解説：**
+- `findAll()`: 条件に一致する全ての要素を取得
+- `at(index)`: 指定したインデックスの要素を取得
+- `exists()`: 要素が存在するかチェック
+
+---
+
+## ⚡ **Step 5: イベントテスト**
+
+### 5.1 プルダウン変更のテスト
+```javascript
+const plans = wrapper.find('select[name="product_09_01"]').findAll('option')
+plans.filter(node => node.text() == '5,000').at(0).setSelected()
+await wrapper.vm.$nextTick()
+```
+
+**解説：**
+- `filter()`: 条件に一致する要素をフィルタリング
+- `setSelected()`: option要素を選択状態にする
+- イベント発生後は必ず`$nextTick()`で更新を待つ
+
+### 5.2 ボタンクリックのテスト
+```javascript
+wrapper.find('.qa71').trigger('click')
+await wrapper.vm.$nextTick()
+const modal = wrapper.find('.modaal-wrapper')
+expect(modal.exists()).toBe(true)
+expect(modal.isVisible()).toBe(true)
+```
+
+**解説：**
+- `trigger()`: DOMイベントを発火
+- `isVisible()`: 要素が表示されているかチェック
+
+---
+
+## 🔄 **Step 6: 非同期テストパターン**
+
+### 6.1 プルダウン変更による保険料計算テスト
+```javascript
+const expectAmountChangeByPulldownItems = (async (wrapper, pulldownItems, options, baseAmount) => {
+  let lastAmount = baseAmount
+  for (const option of options) {
+    const toBeSelected = pulldownItems.filter(node => node.text() == option)
+    expect(toBeSelected.length).toBe(1)
+    toBeSelected.at(0).setSelected()
+    await wrapper.vm.$nextTick()
+    const currentAmount = wrapper.vm.applicationValues.sumameRabbit
+    expect(currentAmount).not.toBe(0)
+    expect(currentAmount).not.toBe(lastAmount)
+    lastAmount = currentAmount
+  }
+  return lastAmount
+})
+```
+
+**解説：**
+- 各選択肢で保険料が変わることを検証
+- `for...of`: 配列をループ処理
+- 前回の金額と異なることを確認
+
+---
+
+## 🧪 **Step 7: モックとスパイの応用**
+
+### 7.1 日付のモック
+```javascript
+beforeEach(() => {
+  const useDate = new Date(2019, 1, 1)
+  const OriginalDate = Date
+  mockDate = jest.spyOn(global, 'Date')
+  mockDate.mockImplementation(arg1 => {
+    return arg1 ? new OriginalDate(arg1) : useDate
+  })
+})
+```
+
+**解説：**
+- `jest.spyOn()`: 既存の関数やオブジェクトを監視
+- `mockImplementation()`: モック関数の実装を定義
+- テスト実行時の日付を固定化
+
+### 7.2 DOM要素のモック
+```javascript
+const dummyElements = {
+  sumameRabbitAccordionTarget: { style: { height: -1 } },
+  sumameRabbitAccordionBody: { clientHeight: 100 }
+}
+jest.spyOn(document, 'getElementById')
+    .mockImplementation((id) => dummyElements[id])
+```
+
+**解説：**
+- `document.getElementById`をモック化
+- 実際のDOM要素の代わりにダミーオブジェクトを返す
+
+---
+
+## 🎨 **Step 8: 実践的なテストパターン**
+
+### 8.1 条件分岐のテスト
+```javascript
+it('ケース 2-2 特定疾病保険料払込免除特則：非表示（81歳）', async () => {
+  let localApplication = getApplication()
+  localApplication.fullAge = 81
+
+  const wrapper = mount(ProductDetailSumameRabbit, {
+    // ... 設定
+  })
+
+  // 年齢制限により非表示になることをテスト
+  const selector = wrapper.find('select[name="product_09_07"]')
+  expect(selector.exists()).toBe(false)
+  expect(elm.find('p').text()).toBe('お客様のご契約年齢では、お取り扱いできません。')
+})
+```
+
+**解説：**
+- 年齢による表示/非表示の切り替えをテスト
+- 条件により要素が存在しないことも検証
+
+### 8.2 モーダル表示のテスト
+```javascript
+it('ケース 24-1 入院給付金ボタン：ヘルプボタン押下時', async () => {
+  wrapper.find('.qa71').trigger('click')
+  await wrapper.vm.$nextTick()
+  
+  const modal = wrapper.find('.modaal-wrapper')
+  expect(modal.exists()).toBe(true)
+  expect(modal.isVisible()).toBe(true)
+  
+  const iframeElement = wrapper.find('.modal-iframe')
+  const iframeSrc = iframeElement.attributes('src')
+  expect(iframeSrc).toBe('\\public\\words_sumame_rabbit.html#qa71')
+  
+  wrapper.vm.closeModal()
+  await flushPromises()
+  const modal2 = wrapper.find('.modaal-wrapper')
+  expect(modal2.exists()).toBe(false)
+})
+```
+
+**解説：**
+- モーダルの開閉をテスト
+- `attributes()`: HTML属性の取得
+- `flushPromises()`: 全ての非同期処理の完了を待機
+
+---
+
+## 📝 **Step 9: テストの書き方のベストプラクティス**
+
+### 9.1 テストケースの命名
+```javascript
+it('ケース 1-1 入院給付金日額：表示（20歳）', async () => {
+```
+
+**ポイント：**
+- 何をテストしているか明確に
+- 条件（年齢など）も記載
+- 一意の識別子を含める
+
+### 9.2 アサーションの書き方
+```javascript
+// ❌ 悪い例
+expect(selector.length > 0).toBe(true)
+
+// ✅ 良い例
+expect(selector.length).toBe(8)
+expect(selector.exists()).toBe(true)
+```
+
+**ポイント：**
+- 具体的な値で検証
+- 意味のあるアサーションを書く
+
+---
+
+## 🚀 **Step 10: 実際にテストを書いてみよう**
+
+### 簡単な例から始める
+```javascript
+// 基本的な表示テスト
+it('コンポーネントが正しく表示される', async () => {
+  const wrapper = mount(MyComponent, {
+    propsData: { title: 'テスト' }
+  })
+  
+  expect(wrapper.find('h1').text()).toBe('テスト')
+})
+
+// イベントテスト
+it('ボタンクリックで値が変わる', async () => {
+  const wrapper = mount(MyComponent)
+  
+  await wrapper.find('button').trigger('click')
+  await wrapper.vm.$nextTick()
+  
+  expect(wrapper.vm.count).toBe(1)
+})
+```
+
+---
+
+## 📋 **重要なポイントまとめ**
+
+1. **非同期処理**: `async/await`と`$nextTick()`を必ず使う
+2. **モック**: 外部依存は必ずモック化する
+3. **具体的なテスト**: 抽象的でなく具体的な値で検証
+4. **テストの独立性**: 各テストは他に依存しない
+5. **可読性**: テスト名と内容を明確に
+
+このような段階的なアプローチで、Vue.jsのテストを理解していけば、効果的なテストが書けるようになります！
