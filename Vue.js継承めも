@@ -1,0 +1,48 @@
+# Vue.js 親子コンポーネント - 新人エンジニア向けシンプル解説## 🎯 実際のプロジェクトでの活用例
+
+あなたが作業しているテストコードも、この親子関係を検証しています：
+
+```javascript
+// ProductDetailSumame.vue（親コンポーネント）
+const wrapper = mount(ProductDetailSumame, {
+  propsData: {
+    application: getApplication(),      // 親から渡すProps
+    constants: getConstants(),          // 設定情報
+    applicationValues: getApplicationValues() // 計算値
+  }
+})
+
+// 子コンポーネントのプルダウン操作
+const plans = wrapper.find('select[name="product_02_01"]')
+plans.filter(node => node.text() == '5,000').at(0).setSelected()
+
+// 親コンポーネントの状態変化を確認
+expect(wrapper.vm.applicationValues.sumame).not.toBe(0)
+```
+
+## 💡 新人エンジニアへのアドバイス
+
+### **まず理解すべき3つのポイント**
+
+1. **🎯 Props は「設定」** - 親が子に「こうして」と指示
+2. **📢 Events は「報告」** - 子が親に「こうなった」と報告  
+3. **🔄 データは一方通行** - 必ず親→子の流れを守る
+
+### **実際のコードで確認してみよう**
+
+今度 ProductDetailSumame.vue を見る時は：
+- `props:` の部分 → 親から何を受け取っているか
+- `this.$emit()` の部分 → 親に何を伝えているか  
+- `@event-name` の部分 → 子からのイベントを受け取っているか
+
+を意識して読むと、コンポーネントの役割分担が見えてきます！
+
+### **デバッグのコツ**
+
+```javascript
+// Vue DevTools で確認できること
+console.log('受け取ったProps:', this.$props)
+console.log('発行したイベント:', this.$listeners)
+```
+
+この基本を押さえれば、Vue.jsアプリケーションの全体像が理解できるようになります！🚀
