@@ -1,0 +1,256 @@
+# 🚀 **Vue.js テストコード チートシート**
+
+## 📋 **基本セットアップ**
+
+```javascript
+import { mount, createLocalVue } from '@vue/test-utils' // テスト用ライブラリ
+import Component from '@/components/Component.vue'      // テスト対象コンポーネント
+import flushPromises from 'flush-promises'              // 非同期処理待機
+
+describe('Component.vue', () => {                        // テストグループ
+  let wrapper                                           // コンポーネントラッパー
+  
+  beforeEach(() => {                                    // 各テスト前実行
+    // 共通セットアップ
+  })
+  
+  afterEach(() => {                                     // 各テスト後実行
+    if (wrapper) wrapper.destroy()                      // メモリクリーンアップ
+    jest.restoreAllMocks()                              // モック復元
+  })
+  
+  it('テスト名', async () => {                          // 個別テスト
+    // テスト内容
+  })
+})
+```
+
+---
+
+## 🎯 **コンポーネントマウント**
+
+```javascript
+// ✅ 基本マウント
+const wrapper = mount(Component, {                      // コンポーネントをDOMにマウント
+  propsData: { prop1: 'value' },                       // 親から渡すプロパティ
+  mocks: { $store: mockStore },                        // Vue インスタンスのモック
+  components: { Modal: MockModal }                     // 子コンポーネントのモック
+})
+
+// ✅ LocalVue使用
+const localVue = createLocalVue()                      // 独立したVueインスタンス
+const wrapper = mount(Component, { localVue })         // 隔離環境でマウント
+```
+
+---
+
+## 🔧 **モック作成パターン**
+
+### **基本モック**
+```javascript
+const mockFn = jest.fn()                               // 空のモック関数
+const mockFnWithReturn = jest.fn().mockReturnValue(42) // 戻り値付きモック
+const mockFnAsync = jest.fn().mockResolvedValue(data)  // 非同期モック(成功)
+const mockFnError = jest.fn().mockRejectedValue(error) // 非同期モック(失敗)
+```
+
+### **メソッドモック**
+```javascript
+wrapper.vm.methodName = jest.fn()                      // メソッドをモック化
+jest.spyOn(wrapper.vm, 'methodName')                   // メソッドを監視
+wrapper.vm.methodName.mockReturnValue(100)             // 戻り値設定
+```
+
+### **Vuexストアモック**
+```javascript
+const mockStore = {                                    // ストアの偽物
+  getters: {                                           // gettersオブジェクト
+    'module/getter': jest.fn().mockReturnValue(true)   // getter関数のモック
+  },
+  dispatch: jest.fn(),                                 // action実行のモック
+  commit: jest.fn()                                    // mutation実行のモック
+}
+```
+
+### **DOM要素モック**
+```javascript
+const mockElements = {                                 // 偽のDOM要素
+  elementId: {                                         // 要素ID
+    style: { height: '0px' },                         // スタイルプロパティ
+    clientHeight: 100                                  // 高さプロパティ
+  }
+}
+jest.spyOn(document, 'getElementById')                 // DOM検索メソッド監視
+    .mockImplementation(id => mockElements[id])        // 偽要素を返すよう置換
+```
+
+### **日付モック**
+```javascript
+const fixedDate = new Date(2019, 9, 1)                // 固定日付作成
+const mockDate = jest.spyOn(global, 'Date')           // Dateコンストラクター監視
+    .mockImplementation(() => fixedDate)               // 常に固定日付を返す
+// テスト後: mockDate.mockRestore()                   // 元に戻す
+```
+
+---
+
+## 🔍 **DOM操作とイベント**
+
+```javascript
+// ✅ 要素検索
+wrapper.find('.class-name')                           // クラス名で検索
+wrapper.find('#element-id')                           // ID で検索
+wrapper.find('select[name="field"]')                  // 属性で検索
+wrapper.findAll('option')                             // 複数要素検索
+
+// ✅ 要素の状態確認
+wrapper.find('.element').exists()                     // 要素が存在するか
+wrapper.find('.element').isVisible()                  // 要素が表示されているか
+wrapper.find('select').attributes().disabled          // disabled属性の確認
+
+// ✅ 要素の値取得
+wrapper.find('.text').text()                          // テキスト内容取得
+wrapper.find('input').element.value                   // input要素の値
+wrapper.find('select').element.selectedIndex          // select要素の選択インデックス
+
+// ✅ イベント発火
+wrapper.find('button').trigger('click')               // クリックイベント発火
+wrapper.find('select').setValue('3')                  // select要素の値設定
+wrapper.find('input').setChecked(true)                // checkbox/radioの設定
+```
+
+---
+
+## ⏱️ **非同期処理**
+
+```javascript
+// ✅ DOM更新待機
+await wrapper.vm.$nextTick()                          // 次のDOM更新まで待機
+
+// ✅ 全Promise完了待機
+await flushPromises()                                  // 全ての非同期処理完了まで待機
+
+// ✅ タイマーモック
+jest.useFakeTimers()                                   // 偽のタイマー使用
+jest.advanceTimersByTime(5000)                        // 5秒進める
+jest.useRealTimers()                                   // 実際のタイマーに戻す
+```
+
+---
+
+## ✅ **アサーション（検証）**
+
+### **基本検証**
+```javascript
+expect(value).toBe(expected)                          // 厳密等価比較
+expect(value).toEqual(expected)                       // 深い等価比較
+expect(value).not.toBe(unexpected)                    // 否定
+expect(array).toHaveLength(3)                         // 配列長さ
+expect(string).toMatch(/pattern/)                     // 正規表現マッチ
+```
+
+### **DOM検証**
+```javascript
+expect(wrapper.find('.class').exists()).toBe(true)    // 要素存在確認
+expect(wrapper.find('.text').text()).toBe('hello')    // テキスト内容確認
+expect(wrapper.findAll('li')).toHaveLength(5)         // 要素数確認
+```
+
+### **関数呼び出し検証**
+```javascript
+expect(mockFn).toHaveBeenCalled()                     // 呼び出された
+expect(mockFn).toHaveBeenCalledTimes(2)               // 2回呼び出された
+expect(mockFn).toHaveBeenCalledWith(arg1, arg2)       // 引数付きで呼び出された
+expect(mockFn).not.toHaveBeenCalled()                 // 呼び出されていない
+```
+
+---
+
+## 🎨 **実用テンプレート**
+
+### **基本表示テスト**
+```javascript
+it('正しく表示される', () => {
+  const wrapper = mount(Component, {                   // コンポーネントマウント
+    propsData: { title: 'Test' }                      // props設定
+  })
+  expect(wrapper.find('h1').text()).toBe('Test')      // 表示内容確認
+})
+```
+
+### **プルダウン変更テスト**
+```javascript
+it('選択変更で値が更新される', async () => {
+  const wrapper = mount(Component)                     // コンポーネントマウント
+  const spy = jest.spyOn(wrapper.vm, 'onChange')      // メソッド監視
+  
+  await wrapper.find('select').setValue('2')          // 値変更
+  await wrapper.vm.$nextTick()                        // DOM更新待機
+  
+  expect(spy).toHaveBeenCalled()                      // メソッド呼び出し確認
+})
+```
+
+### **モーダル表示テスト**
+```javascript
+it('ボタンクリックでモーダル表示', async () => {
+  const wrapper = mount(Component)                     // コンポーネントマウント
+  
+  await wrapper.find('.help-button').trigger('click') // ボタンクリック
+  await wrapper.vm.$nextTick()                        // DOM更新待機
+  
+  expect(wrapper.find('.modal').exists()).toBe(true)  // モーダル表示確認
+})
+```
+
+### **年齢制限テスト**
+```javascript
+it('年齢により表示制御される', () => {
+  const wrapper = mount(Component, {                   // コンポーネントマウント
+    propsData: { 
+      application: { fullAge: 81 }                    // 81歳設定
+    }
+  })
+  expect(wrapper.find('select').exists()).toBe(false) // 要素非表示確認
+  expect(wrapper.find('p').text())                    // エラーメッセージ確認
+    .toBe('お客様のご契約年齢では、お取り扱いできません。')
+})
+```
+
+---
+
+## 🚨 **よくあるエラーと対処法**
+
+```javascript
+// ❌ エラー: Cannot read property 'xxx' of undefined
+// ✅ 対処: propsData で必要データを渡す
+const wrapper = mount(Component, {
+  propsData: { application: { fullAge: 20 } }         // 必要なデータを設定
+})
+
+// ❌ エラー: [Vue warn] Unknown custom element
+// ✅ 対処: 子コンポーネントをモック化
+const wrapper = mount(Component, {
+  components: { ChildComponent: { template: '<div/>' } } // 子コンポーネントのモック
+})
+
+// ❌ エラー: TypeError: Cannot read property 'getElementById'
+// ✅ 対処: DOM要素をモック化
+jest.spyOn(document, 'getElementById')                 // DOM メソッドのモック
+    .mockReturnValue({ style: {} })                   // 偽要素を返す
+```
+
+---
+
+## 📝 **クリーンアップチェックリスト**
+
+```javascript
+afterEach(() => {
+  if (wrapper) wrapper.destroy()                      // ✅ ラッパー破棄
+  jest.restoreAllMocks()                              // ✅ モック復元
+  jest.clearAllMocks()                                // ✅ モック履歴クリア
+  jest.useRealTimers()                                // ✅ タイマー復元
+})
+```
+
+このチートシートがあれば、Vue.jsテストの90%は書けるようになります！
