@@ -1,0 +1,437 @@
+# 🏗️ **Vue.js マウント完全ガイド（テスト特化）**
+
+## 🎯 **マウントとは？（3秒で理解）**
+
+```javascript
+// 普通のVueコンポーネント = ただのJavaScriptオブジェクト
+const Component = { template: '<div>Hello</div>' }
+
+// マウント = コンポーネントを実際のDOMにして動作させること
+const wrapper = mount(Component) // 仮想DOMに配置して使える状態にする
+```
+
+**マウント = コンポーネントを「生きている状態」にすること**
+
+---
+
+## 🔧 **基本的なマウント**
+
+```javascript
+import { mount } from '@vue/test-utils'               // テストライブラリ
+import Component from '@/components/Component.vue'    // テスト対象
+
+const wrapper = mount(Component)                      // 基本マウント
+//    ↑          ↑    ↑
+//    │          │    └─ コンポーネント
+//    │          └─ マウント関数
+//    └─ ラッパーオブジェクト（操作用）
+```
+
+### **マウント実行フロー図解**
+
+```
+【マウント前】
+Component.vue = {
+  template: '<div>{{message}}</div>',
+  data() { return { message: 'Hello' } }
+}
+    ↓ mount() 実行
+【マウント後】
+┌─────────────────────────────────┐
+│        Wrapper Object           │
+│  ┌─────────────────────────────┐ │
+│  │       Virtual DOM           │ │
+│  │   <div>Hello</div>          │ │
+│  └─────────────────────────────┘ │
+│  ┌─────────────────────────────┐ │
+│  │      Vue Instance           │ │
+│  │   data: { message: 'Hello' }│ │
+│  │   methods: { ... }          │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
+```
+
+---
+
+## ⚖️ **mount vs shallowMount**
+
+### **mount（深いマウント）**
+```javascript
+const wrapper = mount(ParentComponent)               // 親コンポーネント
+//                    ↓ 子コンポーネントも全てマウント
+// ParentComponent
+//   ├─ ChildComponent1 ← これもマウントされる
+//   ├─ ChildComponent2 ← これもマウントされる
+//   └─ Modal           ← これもマウントされる
+```
+
+### **shallowMount（浅いマウント）**
+```javascript
+const wrapper = shallowMount(ParentComponent)        // 親コンポーネントのみ
+//                           ↓ 子コンポーネントはスタブ
+// ParentComponent
+//   ├─ <child-component1-stub /> ← 偽物
+//   ├─ <child-component2-stub /> ← 偽物  
+//   └─ <modal-stub />            ← 偽物
+```
+
+### **使い分けガイド**
+```javascript
+// ✅ mount を使う場面
+mount(Component)          // 子コンポーネントとの連携をテストしたい
+mount(SimpleComponent)    // 子コンポーネントが少ない・軽い
+
+// ✅ shallowMount を使う場面  
+shallowMount(Component)   // 親コンポーネント単体をテストしたい
+shallowMount(HeavyComponent) // 子コンポーネントが重い・複雑
+```
+
+---
+
+## 🎛️ **マウントオプション詳解**
+
+### **propsData（プロパティ渡し）**
+```javascript
+const wrapper = mount(Component, {                   // マウント設定
+  propsData: {                                       // プロパティオブジェクト
+    title: 'Test Title',                             // 文字列プロパティ
+    count: 42,                                       // 数値プロパティ
+    user: { name: 'John', age: 30 },                 // オブジェクトプロパティ
+    items: ['item1', 'item2']                        // 配列プロパティ
+  }
+})
+
+// コンポーネント内では this.title, this.count でアクセス可能
+```
+
+### **mocks（Vueインスタンスのモック）**
+```javascript
+const wrapper = mount(Component, {                   // マウント設定
+  mocks: {                                           // モックオブジェクト
+    $store: mockStore,                               // Vuexストアのモック
+    $route: { path: '/test' },                       // Vue Routerのモック
+    $t: (key) => key                                 // i18n翻訳のモック
+  }
+})
+
+// コンポーネント内では this.$store, this.$route でアクセス
+```
+
+### **components（子コンポーネントのモック）**
+```javascript
+const MockChild = {                                  // 軽量な偽コンポーネント
+  template: '<div class="mock-child">Mock</div>',    // シンプルなテンプレート
+  props: ['value']                                   // 必要最小限のプロパティ
+}
+
+const wrapper = mount(Component, {                   // マウント設定
+  components: {                                      // コンポーネント置換
+    ChildComponent: MockChild                        // 実際の子を偽物に置換
+  }
+})
+```
+
+### **data（初期データ上書き）**
+```javascript
+const wrapper = mount(Component, {                   // マウント設定
+  data() {                                           // データ関数
+    return {                                         // 初期データ
+      message: 'Test Message',                       // 元のdataを上書き
+      isLoading: false                               // テスト用の状態
+    }
+  }
+})
+```
+
+---
+
+## 🎮 **マウント後の操作パターン**
+
+### **DOM要素アクセス**
+```javascript
+const wrapper = mount(Component)                     // コンポーネントマウント
+
+// ✅ 要素検索
+const button = wrapper.find('button')               // ボタン要素取得
+const input = wrapper.find('#user-name')            // ID指定で取得
+const items = wrapper.findAll('.list-item')         // 複数要素取得
+
+// ✅ 要素の状態確認
+expect(button.exists()).toBe(true)                  // 要素存在確認
+expect(input.isVisible()).toBe(true)                // 表示状態確認
+expect(items).toHaveLength(3)                       // 要素数確認
+```
+
+### **データアクセス**
+```javascript
+const wrapper = mount(Component)                     // コンポーネントマウント
+
+// ✅ Vueインスタンスへのアクセス
+console.log(wrapper.vm.message)                     // data プロパティ
+wrapper.vm.message = 'New Message'                  // data 変更
+wrapper.vm.handleClick()                            // メソッド実行
+
+// ✅ プロパティアクセス
+console.log(wrapper.props())                        // 全プロパティ取得
+console.log(wrapper.props('title'))                 // 特定プロパティ取得
+```
+
+### **イベント発火**
+```javascript
+const wrapper = mount(Component)                     // コンポーネントマウント
+
+// ✅ イベントトリガー
+await wrapper.find('button').trigger('click')       // クリックイベント
+await wrapper.find('input').trigger('input')        // インプットイベント
+await wrapper.find('form').trigger('submit')        // サブミットイベント
+
+// ✅ 値の設定
+await wrapper.find('input').setValue('test')        // インプット値設定
+await wrapper.find('select').setValue('option2')    // セレクト値設定
+await wrapper.find('checkbox').setChecked(true)     // チェックボックス設定
+```
+
+---
+
+## ⏱️ **マウント時のライフサイクル**
+
+```javascript
+// マウント時に実行されるライフサイクル順序
+const wrapper = mount(Component)
+//              ↓
+//         【Vue内部処理】
+//              ↓
+//        1. beforeCreate
+//              ↓  
+//        2. created      ← API呼び出しなど
+//              ↓
+//        3. beforeMount
+//              ↓
+//        4. mounted      ← DOM操作可能
+//              ↓
+//        【テスト開始】
+```
+
+### **ライフサイクルを利用したテスト**
+```javascript
+it('mounted でAPI呼び出しされる', () => {
+  const spy = jest.spyOn(Component.methods, 'fetchData') // API監視
+  
+  const wrapper = mount(Component)                     // マウント（mountedが実行される）
+  
+  expect(spy).toHaveBeenCalled()                      // API呼び出し確認
+})
+
+it('created で初期化される', () => {
+  const wrapper = mount(Component, {                   // マウント
+    propsData: { userId: 123 }                        // プロパティ設定
+  })
+  
+  // created で設定されたデータを確認
+  expect(wrapper.vm.isInitialized).toBe(true)
+})
+```
+
+---
+
+## 🔄 **非同期マウント**
+
+```javascript
+// ✅ 基本的な非同期待機
+it('非同期処理後の状態確認', async () => {
+  const wrapper = mount(Component)                     // マウント
+  
+  await wrapper.vm.$nextTick()                        // DOM更新待機
+  
+  expect(wrapper.find('.updated').exists()).toBe(true)
+})
+
+// ✅ 外部Promise待機
+it('API呼び出し完了後の状態', async () => {
+  const wrapper = mount(Component)                     // マウント
+  
+  await flushPromises()                               // 全Promise完了待機
+  
+  expect(wrapper.vm.data).toEqual(expectedData)
+})
+
+// ✅ タイムアウト待機
+it('遅延処理の確認', async () => {
+  jest.useFakeTimers()                                // 偽タイマー使用
+  
+  const wrapper = mount(Component)                     // マウント
+  
+  jest.advanceTimersByTime(1000)                     // 1秒進める
+  await wrapper.vm.$nextTick()                        // DOM更新待機
+  
+  expect(wrapper.find('.delayed').exists()).toBe(true)
+  
+  jest.useRealTimers()                                // 実タイマー復元
+})
+```
+
+---
+
+## 🎯 **実用的なマウントパターン**
+
+### **Pattern 1: 基本マウント**
+```javascript
+describe('BasicComponent', () => {
+  let wrapper                                          // ラッパー変数
+  
+  beforeEach(() => {                                   // 各テスト前に実行
+    wrapper = mount(BasicComponent, {                  // 共通マウント設定
+      propsData: { title: 'Test' }                    // 共通プロパティ
+    })
+  })
+  
+  afterEach(() => {                                    // 各テスト後に実行
+    wrapper.destroy()                                  // メモリクリーンアップ
+  })
+  
+  it('正しく表示される', () => {
+    expect(wrapper.find('h1').text()).toBe('Test')    // 表示確認
+  })
+})
+```
+
+### **Pattern 2: 複雑なマウント**
+```javascript
+describe('ComplexComponent', () => {
+  const createWrapper = (props = {}) => {             // ラッパー作成関数
+    return mount(ComplexComponent, {                   // マウント設定
+      propsData: {                                     // デフォルトプロパティ
+        user: { name: 'Test User' },                  // 基本ユーザー
+        ...props                                       // 追加プロパティでオーバーライド
+      },
+      mocks: {                                         // モック設定
+        $store: mockStore                              // ストアモック
+      },
+      components: {                                    // 子コンポーネントモック
+        Modal: MockModal                               // モーダルモック
+      }
+    })
+  }
+  
+  it('管理者ユーザーの表示', () => {
+    const wrapper = createWrapper({                    // カスタムプロパティ
+      user: { name: 'Admin', role: 'admin' }          // 管理者設定
+    })
+    
+    expect(wrapper.find('.admin-menu').exists()).toBe(true)
+  })
+})
+```
+
+### **Pattern 3: 条件付きマウント**
+```javascript
+describe('ConditionalComponent', () => {
+  it.each([                                          // パラメータ化テスト
+    { age: 19, expectVisible: false },               // 未成年
+    { age: 20, expectVisible: true },                // 成人
+    { age: 81, expectVisible: false }                // 高齢
+  ])('年齢 $age の場合の表示', ({ age, expectVisible }) => {
+    const wrapper = mount(ConditionalComponent, {     // マウント
+      propsData: { userAge: age }                     // 年齢プロパティ
+    })
+    
+    expect(wrapper.find('.age-restricted').isVisible())
+      .toBe(expectVisible)                           // 表示状態確認
+  })
+})
+```
+
+---
+
+## 🚨 **よくあるマウントエラー**
+
+### **❌ 不完全なプロパティ**
+```javascript
+// エラー: Cannot read property 'name' of undefined
+const wrapper = mount(Component)                     // プロパティ不足
+wrapper.vm.user.name                                // エラー発生
+
+// ✅ 正しい対処
+const wrapper = mount(Component, {                   // 必要プロパティ設定
+  propsData: {
+    user: { name: 'Test User' }                     // 必要なオブジェクト構造
+  }
+})
+```
+
+### **❌ 子コンポーネントエラー**
+```javascript
+// エラー: [Vue warn] Unknown custom element: <child-component>
+const wrapper = mount(ParentComponent)              // 子コンポーネント未定義
+
+// ✅ 正しい対処法1: 子コンポーネントをモック
+const wrapper = mount(ParentComponent, {             // 子をモック化
+  components: {
+    ChildComponent: { template: '<div></div>' }      // 最小限のモック
+  }
+})
+
+// ✅ 正しい対処法2: shallowMount使用
+const wrapper = shallowMount(ParentComponent)       // 子を自動スタブ化
+```
+
+### **❌ 非同期処理の待機忘れ**
+```javascript
+// エラー: テストが不安定、時々失敗する
+it('データ更新テスト', () => {
+  const wrapper = mount(Component)                   // マウント
+  wrapper.vm.updateData()                           // 非同期メソッド実行
+  expect(wrapper.vm.data).toBe('updated')           // まだ更新されていない
+})
+
+// ✅ 正しい対処
+it('データ更新テスト', async () => {
+  const wrapper = mount(Component)                   // マウント
+  await wrapper.vm.updateData()                     // 非同期待機
+  await wrapper.vm.$nextTick()                      // DOM更新待機
+  expect(wrapper.vm.data).toBe('updated')           // 更新後の確認
+})
+```
+
+---
+
+## 📋 **マウント選択ガイド**
+
+```
+何をテストしたい？
+    ↓
+┌─────────────────────┐
+│  コンポーネント単体   │ → shallowMount
+└─────────────────────┘
+
+┌─────────────────────┐
+│ 親子の連携・統合     │ → mount
+└─────────────────────┘
+
+┌─────────────────────┐
+│ 軽い・シンプル       │ → mount
+└─────────────────────┘
+
+┌─────────────────────┐
+│ 重い・複雑          │ → shallowMount + mocks
+└─────────────────────┘
+```
+
+---
+
+## 🎯 **マウント総まとめ**
+
+| 項目 | 使い方 | 目的 |
+|------|--------|------|
+| `mount()` | 基本マウント | 完全なコンポーネントテスト |
+| `shallowMount()` | 浅いマウント | 単体テスト |
+| `propsData` | プロパティ渡し | 親からのデータ設定 |
+| `mocks` | Vue機能モック | 外部依存の置換 |
+| `components` | 子コンポーネントモック | 子の簡略化 |
+
+**覚え方：**
+- `mount` = 本格的なテスト
+- `shallowMount` = 単体テスト
+- オプション = テスト環境の調整
+
+マウントを理解すれば、Vue.jsテストの80%は攻略できます！
