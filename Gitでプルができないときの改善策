@@ -1,0 +1,325 @@
+# 【新人エンジニア向け】VSCodeでGitプルできない時の対処法
+
+## 🚨 よくあるエラーメッセージと対処法
+
+### 1. "Your local changes would be overwritten by merge"
+
+**エラーの意味**: ローカルの変更がリモートの変更と競合している
+
+#### 📋 VSCodeでの確認方法
+1. **ソース管理タブ**（Ctrl+Shift+G）を開く
+2. **変更**セクションに未コミットのファイルが表示される
+3. ファイル名の横に「M」（Modified）マークが付いている
+
+#### 🔧 対処法
+
+**✅ 方法1: 変更をコミットする**
+ローカルの変更を保存したい場合：
+```bash
+git add .
+git commit -m "ローカル変更の保存"
+git pull
+```
+
+**VSCodeの操作**:
+1. ソース管理タブで変更されたファイルの「+」をクリック（ステージング）
+2. コミットメッセージを入力
+3. 「コミット」ボタンをクリック
+4. 「同期」ボタンをクリック
+
+**✅ 方法2: 変更を一時的に退避（stash）する**
+一時的に変更を退避して、後で戻す方法：
+```bash
+git stash
+git pull
+git stash pop
+```
+
+**VSCodeでのstash操作**:
+1. コマンドパレット（Ctrl+Shift+P）で「Git: Stash」を検索
+2. 「Git: Stash (Include Untracked)」を選択
+3. プル完了後、「Git: Pop Latest Stash」で変更を復元
+
+> ⚠️ `stash pop`で変更を戻す際にコンフリクトが起きる可能性があるので、注意してください。
+
+**✅ 方法3: 変更を破棄する**
+ローカルの変更を不要とする場合：
+```bash
+git reset --hard
+git clean -fd
+git pull
+```
+
+**VSCodeの操作**:
+1. ソース管理タブで変更されたファイルを右クリック
+2. 「変更を破棄」を選択
+3. 「同期」ボタンをクリック
+
+> ⚠️ この操作はローカルの変更が完全に失われます！元に戻せません。
+
+---
+
+### 🎯 3つの方法の使い分け
+
+| 方法 | 使用場面 | メリット | デメリット |
+|------|----------|----------|------------|
+| **コミット** | 作業が区切りの良い状態 | 履歴に残る、後で追跡可能 | 未完成の状態でもコミット履歴に残る |
+| **stash** | 作業途中だが一時的にプル | 作業を一時保存、後で復元可能 | 複数stashすると管理が大変 |
+| **破棄** | 実験的な変更など不要な場合 | 確実にクリーンな状態になる | 変更が完全に失われる |
+
+### 💡 追加のstash活用法
+
+```bash
+# stashの一覧を確認
+git stash list
+
+# 特定のstashを適用
+git stash apply stash@{0}
+
+# 不要なstashを削除
+git stash drop
+
+# 全てのstashを削除
+git stash clear
+```
+
+**VSCodeでのstash管理**:
+- コマンドパレットから「Git: Stash」系のコマンドを活用
+- 「Git: Pop Latest Stash」で最新のstashを復元
+- 「Git: Apply Latest Stash」で復元（stashは残る）
+
+**エラーの意味**: ローカルとリモートで異なるコミット履歴になっている
+
+#### 🔧 対処法
+
+**方法A: マージでプル**
+```bash
+git pull --no-rebase
+```
+
+**方法B: リベースでプル**
+```bash
+git pull --rebase
+```
+
+**VSCodeの設定**:
+1. 設定（Ctrl+,）を開く
+2. 「git.rebaseWhenSync」で検索
+3. チェックボックスでリベース/マージを選択
+
+---
+
+### 3. "Authentication failed"
+
+**エラーの意味**: GitHubやGitLabへの認証に失敗している
+
+#### 🔧 対処法
+
+**Personal Access Token（PAT）の設定**:
+1. GitHubの設定 → Developer settings → Personal access tokens
+2. 新しいトークンを生成
+3. VSCodeで初回プッシュ時にパスワード欄にトークンを入力
+
+**SSH鍵の設定**:
+```bash
+# SSH鍵の生成
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+
+# 公開鍵をクリップボードにコピー
+cat ~/.ssh/id_rsa.pub
+```
+
+---
+
+## 🎯 VSCodeでのGit操作の基本
+
+### ソース管理パネルの見方
+
+| アイコン | 意味 |
+|---------|------|
+| M | Modified（変更） |
+| A | Added（追加） |
+| D | Deleted（削除） |
+| U | Untracked（未追跡） |
+| C | Conflict（競合） |
+
+### 基本的な操作手順
+
+1. **変更の確認**
+   - ソース管理タブで変更されたファイルをクリック
+   - 差分が表示される
+
+2. **ステージング**
+   - ファイルの「+」をクリック
+   - または「すべての変更をステージ」
+
+3. **コミット**
+   - メッセージを入力
+   - 「コミット」ボタンをクリック
+
+4. **プッシュ/プル**
+   - 「同期」ボタンをクリック
+   - または個別に「プッシュ」「プル」
+
+---
+
+## 🛠️ 実践的な解決手順
+
+### Step 1: 現在の状態を確認
+```bash
+git status
+```
+
+**VSCodeでの確認**:
+- ソース管理タブの「変更」セクションをチェック
+- 未コミットファイルがないか確認
+
+### Step 2: 適切な対処法を選択
+
+#### パターン1: 作業中の変更を保持したい（推奨）
+```bash
+git stash
+git pull
+git stash pop
+```
+
+#### パターン2: 変更をコミットしたい
+```bash
+git add .
+git commit -m "作業内容の説明"
+git pull
+```
+
+#### パターン3: 変更を破棄したい
+```bash
+git reset --hard
+git clean -fd
+git pull
+```
+
+### 🎯 どの方法を選ぶべき？
+
+**新人エンジニアには「stash」がおすすめ**
+- 作業を失わない安全性
+- 後で変更を戻せる柔軟性
+- VSCodeでも簡単に操作可能
+
+**選択の基準**:
+1. **作業が途中** → stash
+2. **区切りの良い状態** → commit
+3. **実験的な変更で不要** → reset --hard
+
+### Step 3: 競合が発生した場合
+
+**VSCodeの競合解決**:
+1. 競合ファイルがエディタで開かれる
+2. 「Current Change」「Incoming Change」「Both」から選択
+3. 手動で編集も可能
+4. 保存後、ステージングしてコミット
+
+```bash
+# 競合解決後
+git add .
+git commit -m "競合を解決"
+```
+
+---
+
+## 💡 予防策とベストプラクティス
+
+### 1. 定期的なプル
+```bash
+# 作業開始時
+git pull
+
+# 作業中も定期的に
+git pull
+```
+
+### 2. 小まめなコミット
+- 機能単位でコミット
+- わかりやすいコミットメッセージ
+- 「とりあえずコミット」でも履歴に残る
+
+### 3. stashの活用
+```bash
+# 作業中でも安全にプル
+git stash
+git pull
+git stash pop
+```
+
+### 4. ブランチの活用
+```bash
+# 機能ブランチの作成
+git checkout -b feature/new-function
+
+# 作業完了後
+git checkout main
+git pull
+git merge feature/new-function
+```
+
+### 5. VSCodeの設定確認
+```json
+// settings.json
+{
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.rebaseWhenSync": true
+}
+```
+
+---
+
+## 🚨 トラブルシューティング
+
+### よくある質問
+
+**Q: プルするとファイルが消えた！**
+A: `git reflog`で履歴を確認し、`git reset --hard HEAD@{n}`で復元
+
+**Q: 間違ってコミットしてしまった**
+A: `git reset --soft HEAD~1`で直前のコミットを取り消し
+
+**Q: VSCodeでGitが認識されない**
+A: Gitがインストールされているか確認し、PATHを設定
+
+### 緊急時のコマンド
+
+```bash
+# 全ての変更を破棄して最新状態に
+git reset --hard origin/main
+git clean -fd
+
+# 直前のコミットを取り消し
+git reset --soft HEAD~1
+
+# 強制プッシュ（注意！）
+git push --force-with-lease
+```
+
+---
+
+## 📚 まとめ
+
+1. **エラーメッセージを読む** - 原因を把握する
+2. **現在の状態を確認** - `git status`やVSCodeのソース管理タブ
+3. **適切な対処法を選択** - 変更を保持/コミット/破棄
+4. **新人には「stash」がおすすめ** - 安全で復元可能
+5. **定期的なプル** - 競合を防ぐ
+6. **小まめなコミット** - 作業を小さく分割
+
+### 🎯 新人エンジニアへのアドバイス
+
+**迷った時は「stash」を使う**
+- 作業を失わない
+- 後で変更を戻せる
+- VSCodeでも簡単操作
+
+**3つの方法を使い分ける**
+- コミット: 作業が区切りの良い状態
+- stash: 作業途中だが一時的にプル
+- 破棄: 実験的な変更で不要な場合
+
+VSCodeを使えば、多くのGit操作をGUIで直感的に行えます。エラーが発生したら慌てずに、まずは現在の状態を確認してから適切な対処法を選びましょう！
