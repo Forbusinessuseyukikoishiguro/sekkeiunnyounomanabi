@@ -1,0 +1,363 @@
+# 【VSCode】Gitで差分比較を使いこなす完全ガイド
+
+## 🎯 VSCodeでの差分比較の基本
+
+### ソース管理タブでの差分確認
+
+**基本操作**:
+1. **ソース管理タブ**（Ctrl+Shift+G）を開く
+2. **変更されたファイル**をクリック
+3. **差分エディタ**が自動で開く
+
+**差分エディタの見方**:
+- **左側**: 変更前（HEAD/元のファイル）
+- **右側**: 変更後（現在の作業ファイル）
+- **色分け**: 
+  - 🟢 緑: 追加された行
+  - 🔴 赤: 削除された行
+  - 🟡 黄: 変更された行
+
+---
+
+## 📊 様々な差分比較パターン
+
+### 1. 作業ディレクトリ vs ステージング
+
+**現在の変更を確認**:
+```bash
+git diff
+```
+
+**VSCodeでの確認**:
+- ソース管理タブの「変更」セクションでファイルをクリック
+- 作業ディレクトリとHEADの差分が表示される
+
+### 2. ステージング vs 最新コミット
+
+**ステージされた変更を確認**:
+```bash
+git diff --staged
+# または
+git diff --cached
+```
+
+**VSCodeでの確認**:
+- ソース管理タブの「ステージされた変更」セクションでファイルをクリック
+
+### 3. 特定のコミット間の差分
+
+**コミット間の比較**:
+```bash
+# 直前のコミットと比較
+git diff HEAD~1
+
+# 特定のコミット同士を比較
+git diff commit1 commit2
+
+# 特定のファイルのみ比較
+git diff HEAD~1 HEAD -- filename.js
+```
+
+**VSCodeでの確認**:
+1. **Git履歴**拡張機能を使用
+2. **コマンドパレット**（Ctrl+Shift+P） → "Git: View History"
+3. 比較したいコミットを選択
+
+### 4. ブランチ間の差分
+
+**ブランチ比較**:
+```bash
+# 現在のブランチと他のブランチを比較
+git diff main
+
+# 特定のブランチ同士を比較
+git diff main feature-branch
+
+# 特定のファイルのみ比較
+git diff main feature-branch -- src/components/
+```
+
+**VSCodeでの確認**:
+1. **コマンドパレット** → "Git: Compare References"
+2. 比較するブランチを選択
+
+---
+
+## 🔧 VSCodeの高度な差分機能
+
+### インライン差分の表示
+
+**設定方法**:
+1. 設定（Ctrl+,）を開く
+2. 「diffEditor.renderSideBySide」を検索
+3. チェックを外すとインライン表示
+
+**インライン表示の利点**:
+- 長い行の変更が見やすい
+- 画面の横幅を有効活用
+
+### 差分の無視設定
+
+**空白の違いを無視**:
+```bash
+git diff --ignore-space-change
+git diff --ignore-all-space
+```
+
+**VSCodeの設定**:
+```json
+// settings.json
+{
+  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.renderWhitespace": "all"
+}
+```
+
+### 差分ナビゲーション
+
+**ショートカットキー**:
+- `F7`: 次の差分箇所へ
+- `Shift+F7`: 前の差分箇所へ
+- `Alt+F5`: 次の変更箇所へ
+- `Shift+Alt+F5`: 前の変更箇所へ
+
+---
+
+## 🎨 VSCodeの差分エディタ活用術
+
+### 1. 3-way マージ
+
+**マージ競合時の表示**:
+- **左**: 現在のブランチ（HEAD）
+- **中央**: 結果（編集可能）
+- **右**: マージしようとしているブランチ
+
+**操作方法**:
+1. 「Current Change」ボタンで現在の変更を採用
+2. 「Incoming Change」ボタンで相手の変更を採用
+3. 「Accept Both Changes」で両方を採用
+4. 手動編集も可能
+
+### 2. 差分の部分適用
+
+**特定の変更のみを適用**:
+```bash
+# 対話的に変更を選択
+git add -p filename.js
+```
+
+**VSCodeでの操作**:
+1. 差分エディタで変更箇所を選択
+2. 右クリック → "Stage Selected Lines"
+3. 部分的なステージングが可能
+
+### 3. 差分の出力とエクスポート
+
+**差分をファイルに出力**:
+```bash
+# パッチファイルとして出力
+git diff > changes.patch
+
+# 特定のコミットの差分を出力
+git show commit-hash > commit.patch
+```
+
+**VSCodeでのコピー**:
+1. 差分エディタで差分を選択
+2. Ctrl+C でコピー
+3. 他のエディタやドキュメントに貼り付け
+
+---
+
+## 🛠️ 実践的な差分比較テクニック
+
+### ファイル履歴の確認
+
+**特定ファイルの変更履歴**:
+```bash
+# ファイルの変更履歴を表示
+git log --oneline filename.js
+
+# 各コミットでの変更内容を表示
+git log -p filename.js
+
+# ファイルの変更統計
+git log --stat filename.js
+```
+
+**VSCodeでの確認**:
+1. ファイルを右クリック
+2. "Git: View File History"を選択
+3. 履歴からコミットを選択して差分を確認
+
+### 単語レベルの差分
+
+**単語単位での比較**:
+```bash
+git diff --word-diff
+git diff --word-diff=color
+```
+
+**VSCodeの設定**:
+```json
+{
+  "diffEditor.wordWrap": "on",
+  "diffEditor.diffCodeLens": true
+}
+```
+
+### 移動した行の検出
+
+**行の移動を検出**:
+```bash
+git diff --color-moved
+```
+
+**VSCodeでは自動的に移動検出が有効**
+
+---
+
+## 📱 VSCodeの差分関連拡張機能
+
+### 1. GitLens
+- **機能**: インライン履歴、詳細な差分表示
+- **使い方**: ファイル内でコード行の横に作者・日時を表示
+
+### 2. Git History
+- **機能**: グラフィカルな履歴表示
+- **使い方**: コマンドパレット → "Git: View History"
+
+### 3. Partial Diff
+- **機能**: 任意のテキスト同士の比較
+- **使い方**: テキストを選択して差分比較
+
+---
+
+## 🎯 差分比較のベストプラクティス
+
+### 1. 定期的な差分確認
+```bash
+# 作業前の状態確認
+git status
+git diff
+
+# コミット前の最終確認
+git diff --staged
+```
+
+### 2. 意味のある差分を作る
+- **小さい変更単位**でコミット
+- **関連する変更**をまとめる
+- **フォーマット変更**と**機能変更**を分ける
+
+### 3. 差分の読み方のコツ
+- **赤い行（削除）**を先に読む
+- **緑の行（追加）**で変更内容を確認
+- **前後の文脈**も含めて理解
+
+### 4. VSCodeの設定最適化
+```json
+// settings.json
+{
+  "diffEditor.renderSideBySide": true,
+  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.renderIndicators": true,
+  "diffEditor.codeLens": true,
+  "scm.diffDecorations": "all"
+}
+```
+
+---
+
+## 🚨 よくある差分比較の問題と解決法
+
+### 1. 差分が表示されない
+
+**原因と対処法**:
+- **ファイルがステージされている** → `git diff --staged`を使用
+- **ファイルがコミット済み** → `git diff HEAD~1`で前のコミットと比較
+- **バイナリファイル** → テキストファイルのみ差分表示可能
+
+### 2. 空白の差分が邪魔
+
+**対処法**:
+```bash
+# 空白の変更を無視
+git diff -w
+git diff --ignore-all-space
+```
+
+**VSCodeの設定**:
+```json
+{
+  "diffEditor.ignoreTrimWhitespace": true
+}
+```
+
+### 3. 長い行の差分が見づらい
+
+**対処法**:
+```json
+{
+  "diffEditor.wordWrap": "on",
+  "diffEditor.renderSideBySide": false  // インライン表示
+}
+```
+
+---
+
+## 📚 実践的な使用例
+
+### シナリオ1: プルリクエスト前の確認
+
+```bash
+# 自分の変更を確認
+git diff main
+
+# 特定のディレクトリのみ確認
+git diff main -- src/
+
+# 統計情報も含めて確認
+git diff --stat main
+```
+
+### シナリオ2: マージ前の影響確認
+
+```bash
+# マージ先ブランチとの差分
+git diff main feature-branch
+
+# 競合が起きそうなファイルを事前確認
+git diff main...feature-branch
+```
+
+### シナリオ3: リファクタリング後の確認
+
+```bash
+# 機能に影響がないか確認
+git diff --name-only
+
+# 特定のファイルの詳細確認
+git diff HEAD~1 -- src/utils/helpers.js
+```
+
+---
+
+## 💡 まとめ
+
+### 基本的な差分確認手順
+1. **ソース管理タブ**で変更ファイルを確認
+2. **ファイルをクリック**して差分エディタを開く
+3. **変更内容を確認**して適切な対応を決定
+
+### 効率的な差分確認のコツ
+- **定期的な確認**で変更を把握
+- **適切なツール**を使い分け
+- **意味のある単位**で変更を管理
+
+### VSCodeの強み
+- **直感的な操作**で差分確認
+- **豊富な拡張機能**で機能拡張
+- **統合された環境**で効率的な作業
+
+差分比較を効果的に活用することで、コードの品質向上と効率的な開発が可能になります。まずは基本的な操作から始めて、徐々に高度な機
