@@ -1,0 +1,190 @@
+## 🎯 テスト対象コンポーネント
+
+### **`ProductDetailSumameRabbit.vue` コンポーネント**
+
+```javascript
+import ProductDetailSumameRabbit from '@/components/ProductDetailSumameRabbit.vue'
+```
+
+## 📱 このコンポーネントの正体
+
+### **コンポーネント名の分解**
+```
+ProductDetailSumameRabbit
+├── Product: 保険商品
+├── Detail: 詳細設定
+├── Sumame: すま～医療（商品シリーズ名）
+└── Rabbit: らびっと（商品バリエーション）
+```
+
+## 🏗️ コンポーネントの機能と役割
+
+### **1. 保険商品カスタマイズフォーム**
+```vue
+<!-- このようなフォーム画面をテストしている -->
+<template>
+  <div class="product-detail">
+    <!-- 基本保障設定 -->
+    <section class="main-contract">
+      <h3>基本保障</h3>
+      
+      <!-- 入院給付金日額 -->
+      <select name="product_09_01" v-model="mainBenefitS">
+        <option value="3000">3,000円</option>
+        <option value="4000">4,000円</option>
+        <!-- ... -->
+      </select>
+      
+      <!-- 手術給付金タイプ -->
+      <select name="product_09_04" v-model="operationType">
+        <option value="1">手術１型</option>
+        <option value="2">手術２型</option>
+        <option value="0">手術なし型</option>
+      </select>
+    </section>
+
+    <!-- オプション特約 -->
+    <section class="options">
+      <h3>オプション</h3>
+      
+      <!-- がん診断一時金特約 -->
+      <select name="product_09_16" v-model="cancerDiagnosis">
+        <option value="0">付加しない</option>
+        <option value="300000">30万円</option>
+        <option value="500000">50万円</option>
+        <option value="1000000">100万円</option>
+      </select>
+    </section>
+
+    <!-- 保険料表示 -->
+    <div class="premium-display">
+      <p>保険料: {{ applicationValues.sumameRabbit }}円{{ payPerTimesText.sumameRabbit }}</p>
+    </div>
+  </div>
+</template>
+```
+
+### **2. リアルタイム保険料計算機能**
+```javascript
+// コンポーネント内の計算ロジック
+methods: {
+  calcApplicationP() {
+    // 選択された条件から保険料を計算
+    let premium = this.calculateBasePremium()
+    premium += this.calculateOptionPremium()
+    
+    this.applicationValues.sumameRabbit = premium
+  },
+  
+  dispPerTimes() {
+    // 月払/年払の表示切り替え
+    if (this.payMethodTimes === '01') {
+      this.payPerTimesText.sumameRabbit = '／月'
+    } else {
+      this.payPerTimesText.sumameRabbit = '／年'
+    }
+  }
+}
+```
+
+## 🎨 画面イメージ
+
+### **実際のユーザー画面（推定）**
+```
+┌─────────────────────────────────────┐
+│ すま～らびっと 保険料シミュレーション     │
+├─────────────────────────────────────┤
+│ 【基本保障】                          │
+│ 入院給付金日額: [5,000円 ▼] [?]      │
+│ 入院延長特則:  [3大疾病 ▼] [?]       │
+│ 手術給付金:    [手術2型 ▼] [?]       │
+│                                     │
+│ 【女性医療特約】                      │
+│ 女性入院給付金: [付加しない ▼] [?]    │
+│                                     │
+│ 【オプション】                        │
+│ がん診断一時金: [50万円 ▼] [?]       │
+│ 先進医療特約:   [付加する ▼] [?]      │
+│                                     │
+│ 【設定】                             │
+│ 保険料払込期間: [終身 ▼] [?]         │
+│ 払込方法:      [月払 ▼] [?]          │
+├─────────────────────────────────────┤
+│ 月額保険料: 2,847円／月              │
+└─────────────────────────────────────┘
+```
+
+## 🔧 コンポーネントの技術的特徴
+
+### **1. 双方向データバインディング**
+```javascript
+// 各プルダウンがデータと連動
+data() {
+  return {
+    inputCheckDataSumameRabbit: {
+      mainBenefitS: 5000,           // 入院給付金日額
+      mainOpeTypeCd: '2',           // 手術給付金タイプ
+      options: [                    // 特約設定
+        {
+          optionTypeCd: '406',      // 先進医療特約
+          optionS: 0,               // 金額
+          optionP: 86               // 保険料
+        }
+      ]
+    }
+  }
+}
+```
+
+### **2. 条件による選択肢制御**
+```javascript
+computed: {
+  // 年齢に応じて表示する特約を制御
+  showCancerDiagnosis() {
+    return this.application.fullAge <= 80
+  },
+  
+  // 他の選択に応じて上限を制御
+  maxOutpatientAmount() {
+    const womanAmount = this.womanOutpatientAmount
+    return 50000 - womanAmount // 合計5万円まで
+  }
+}
+```
+
+### **3. リアルタイム計算**
+```javascript
+watch: {
+  // 任意の条件変更で保険料を再計算
+  'inputCheckDataSumameRabbit': {
+    handler() {
+      this.calcApplicationP()  // 保険料計算
+      this.dispPerTimes()      // 表示更新
+    },
+    deep: true
+  }
+}
+```
+
+## 🎯 テストが確認していること
+
+### **このコンポーネントテストの目的**
+
+| テスト観点 | 確認内容 | 例 |
+|:---|:---|:---|
+| **表示制御** | 条件に応じた画面表示 | 81歳でがん特約非表示 |
+| **入力検証** | 不正な組み合わせの防止 | 通院一時金の上限制御 |
+| **計算精度** | 保険料の正確な算出 | 条件変更→保険料変更 |
+| **操作性** | ユーザビリティ | ヘルプモーダル表示 |
+| **データ整合性** | 選択値の矛盾防止 | 型変更時の連動制御 |
+
+## 📋 まとめ
+
+**`ProductDetailSumameRabbit.vue` は：**
+
+- ✅ **保険商品「すま～らびっと」の詳細設定画面**
+- ✅ **ユーザーが条件を選択するインタラクティブフォーム**
+- ✅ **リアルタイムで保険料を計算・表示する機能**
+- ✅ **複雑な保険ルールを分かりやすく操作できるUI**
+
+つまり、**「保険の見積もりシミュレーター」のメインコンポーネント**をテストしているということです！
