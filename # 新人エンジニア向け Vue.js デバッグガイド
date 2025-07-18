@@ -1,0 +1,377 @@
+# 新人エンジニア向け Vue.js デバッグガイド
+
+## はじめに
+
+Vue.jsの開発でバグに遭遇することは日常茶飯事です。この記事では、新人エンジニアが効率的にデバッグできるよう、実践的な手法をステップバイステップで説明します。
+
+## 1. 基本的なデバッグ手法
+
+### console.logを活用した基本デバッグ
+
+```vue
+<template>
+  <div>
+    <h1>{{ title }}</h1>
+    <button @click="increment">カウント: {{ count }}</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      title: 'Vue.js デバッグサンプル',
+      count: 0
+    }
+  },
+  methods: {
+    increment() {
+      console.log('increment前のcount:', this.count); // 実行前の値を確認
+      this.count++;
+      console.log('increment後のcount:', this.count); // 実行後の値を確認
+    }
+  },
+  mounted() {
+    console.log('コンポーネントがマウントされました');
+    console.log('初期データ:', this.$data); // データの初期状態を確認
+  }
+}
+</script>
+```
+
+### リアクティブデータの監視
+
+```vue
+<script>
+export default {
+  data() {
+    return {
+      user: {
+        name: '',
+        email: ''
+      }
+    }
+  },
+  watch: {
+    // 単一プロパティの監視
+    'user.name'(newVal, oldVal) {
+      console.log(`名前が変更されました: ${oldVal} → ${newVal}`);
+    },
+    // オブジェクト全体の深い監視
+    user: {
+      handler(newVal, oldVal) {
+        console.log('ユーザー情報が更新されました:', newVal);
+      },
+      deep: true
+    }
+  }
+}
+</script>
+```
+
+## 2. Google Chrome DevToolsでのデバッグ
+
+### Chrome DevToolsの基本操作
+
+1. **開発者ツールを開く**
+   - `F12` キーまたは `Ctrl + Shift + I` (Windows/Linux)
+   - `Cmd + Option + I` (Mac)
+
+2. **Vue.js DevToolsの活用**
+   - Chrome拡張機能「Vue.js devtools」をインストール
+   - Vueタブでコンポーネントツリーを確認
+   - データとpropsの値をリアルタイムで監視
+
+### ブレークポイントの設定
+
+```vue
+<script>
+export default {
+  methods: {
+    calculateTotal(items) {
+      debugger; // ここで実行が停止
+      let total = 0;
+      for (let item of items) {
+        total += item.price;
+      }
+      return total;
+    },
+    
+    handleSubmit() {
+      // 条件付きブレークポイント用
+      if (this.isDebugMode) {
+        debugger;
+      }
+      // フォーム送信処理
+    }
+  }
+}
+</script>
+```
+
+### Sourcesタブでのデバッグ
+
+1. **ファイル検索**: `Ctrl + P` でファイル名を検索
+2. **行番号クリック**: ブレークポイントを設定
+3. **右クリック**: 条件付きブレークポイントを設定
+4. **Step Over/Into/Out**: コードの実行をステップごとに確認
+
+### Networkタブでのデバッグ
+
+```vue
+<script>
+export default {
+  methods: {
+    async fetchUserData() {
+      try {
+        console.log('API呼び出し開始');
+        const response = await fetch('/api/users');
+        console.log('レスポンス:', response);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('取得データ:', data);
+        return data;
+      } catch (error) {
+        console.error('API呼び出しエラー:', error);
+        // Networkタブでリクエストの詳細を確認
+      }
+    }
+  }
+}
+</script>
+```
+
+## 3. VSCodeでのデバッグ設定
+
+### launch.json設定
+
+`.vscode/launch.json`ファイルを作成：
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Vue.js Chrome Debug",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/src",
+      "breakOnLoad": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/*"
+      }
+    }
+  ]
+}
+```
+
+### デバッグ実行手順
+
+1. **開発サーバーを起動**
+   ```bash
+   npm run serve
+   ```
+
+2. **VSCodeでデバッグ開始**
+   - F5キーまたはRun > Start Debugging
+   - ブレークポイントを設定してデバッグ実行
+
+3. **ブレークポイントの設定**
+   ```vue
+   <script>
+   export default {
+     methods: {
+       processData(data) {
+         // この行にブレークポイントを設定
+         const result = data.map(item => ({
+           ...item,
+           processed: true
+         }));
+         return result;
+       }
+     }
+   }
+   </script>
+   ```
+
+### VSCodeの便利な機能
+
+**変数のホバー表示**
+```vue
+<script>
+export default {
+  data() {
+    return {
+      items: [1, 2, 3, 4, 5]
+    }
+  },
+  computed: {
+    doubledItems() {
+      // デバッグ時に variables にマウスをホバーして値を確認
+      return this.items.map(item => item * 2);
+    }
+  }
+}
+</script>
+```
+
+## 4. よくあるVue.jsのデバッグシナリオ
+
+### リアクティブデータが更新されない
+
+```vue
+<template>
+  <div>
+    <p>{{ userInfo.name }}</p>
+    <button @click="updateName">名前を更新</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      userInfo: {}
+    }
+  },
+  methods: {
+    updateName() {
+      // ❌ 間違い: リアクティブでない
+      this.userInfo.name = '新しい名前';
+      
+      // ✅ 正しい: Vue.setまたは$setを使用
+      this.$set(this.userInfo, 'name', '新しい名前');
+      
+      // または、オブジェクト全体を再代入
+      this.userInfo = { ...this.userInfo, name: '新しい名前' };
+    }
+  }
+}
+</script>
+```
+
+### コンポーネント間のデータ受け渡し
+
+```vue
+<!-- 親コンポーネント -->
+<template>
+  <ChildComponent 
+    :user-data="userData" 
+    @update-user="handleUpdateUser"
+  />
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      userData: { name: 'John', age: 30 }
+    }
+  },
+  methods: {
+    handleUpdateUser(newData) {
+      console.log('子コンポーネントからのデータ:', newData);
+      this.userData = newData;
+    }
+  }
+}
+</script>
+```
+
+```vue
+<!-- 子コンポーネント -->
+<script>
+export default {
+  props: {
+    userData: {
+      type: Object,
+      required: true
+    }
+  },
+  methods: {
+    updateUserData() {
+      console.log('propsのデータ:', this.userData);
+      // 親にデータを送信
+      this.$emit('update-user', { ...this.userData, age: 31 });
+    }
+  }
+}
+</script>
+```
+
+## 5. エラーハンドリングとロギング
+
+### グローバルエラーハンドリング
+
+```javascript
+// main.js
+import Vue from 'vue'
+
+Vue.config.errorHandler = (err, vm, info) => {
+  console.error('Vue エラー:', err);
+  console.error('コンポーネント:', vm);
+  console.error('エラー情報:', info);
+  
+  // 本番環境では外部ログサービスに送信
+  if (process.env.NODE_ENV === 'production') {
+    // logService.send(err, vm, info);
+  }
+}
+```
+
+### 開発環境でのデバッグ情報
+
+```vue
+<script>
+export default {
+  mounted() {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('開発モード - コンポーネント情報');
+      console.log('Props:', this.$props);
+      console.log('Data:', this.$data);
+      console.log('Methods:', Object.keys(this.$options.methods || {}));
+    }
+  }
+}
+</script>
+```
+
+## 6. パフォーマンスデバッグ
+
+### 再レンダリングの監視
+
+```vue
+<script>
+export default {
+  updated() {
+    console.log('コンポーネントが更新されました');
+    console.log('現在のデータ:', this.$data);
+  },
+  
+  computed: {
+    expensiveCalculation() {
+      console.log('重い計算が実行されました');
+      return this.items.reduce((sum, item) => sum + item.value, 0);
+    }
+  }
+}
+</script>
+```
+
+## まとめ
+
+効果的なデバッグは経験とツールの使いこなしが重要です。最初は時間がかかるかもしれませんが、これらの手法を身につけることで、開発効率が大幅に向上します。
+
+**デバッグのポイント**
+- 問題を小さく分割して考える
+- 仮説を立てて検証する
+- ツールを活用して効率化する
+- エラーメッセージを丁寧に読む
+- 段階的に問題を切り分ける
+
+継続的な学習と実践により、デバッグスキルは確実に向上していきます。
