@@ -1,0 +1,343 @@
+# Vue.js 保険料シミュレーション画面 - 新人エンジニア向け解説
+
+## 1. 全体構造の理解
+
+このファイルは **Single File Component (SFC)** 形式のVue.jsコンポーネントです。
+
+```vue
+<template>
+  <!-- HTML構造 -->
+</template>
+
+<script>
+  // JavaScript ロジック
+</script>
+
+<style scoped>
+  /* CSS スタイル */
+</style>
+```
+
+## 2. Vue.js 基本概念の復習
+
+### 2.1 データバインディング
+```html
+<!-- 一方向バインディング -->
+{{ simulationParams.fullAge }}
+
+<!-- 双方向バインディング -->
+<input v-model="simulationParams.mainTypeCd" />
+```
+
+### 2.2 ディレクティブ
+```html
+<!-- 条件付きレンダリング -->
+<div v-if="uiProps.showError">
+
+<!-- リストレンダリング -->
+<li v-for="item in items" :key="item.id">
+
+<!-- イベントハンドリング -->
+<button @click="clickNext()">
+
+<!-- 属性バインディング -->
+<div :class="{ 'border-enable': isActive }">
+```
+
+## 3. Template部分の詳細解析
+
+### 3.1 コンポーネント構造
+```html
+<template>
+  <div id="top">
+    <GlobalHeader />
+    <main>
+      <!-- メインコンテンツ -->
+      <BirthDateGenderInput />
+      <section class="section-area">
+        <!-- 商品選択エリア -->
+      </section>
+    </main>
+    <GlobalFooter />
+  </div>
+</template>
+```
+
+### 3.2 商品選択UI
+各保険商品は `<li>` 要素で表現され、以下の構造：
+
+```html
+<li v-bind:class="{ 'border-enable': simulationParams.mainTypeCd == constants.MAIN_TYPE_CD_MEDICAL_2022 }">
+  <!-- 商品情報表示 -->
+  <div class="top-product-first-area products">
+    <label>
+      <input type="radio" name="product" value="206" v-model="simulationParams.mainTypeCd" />
+      <!-- 商品詳細 -->
+    </label>
+  </div>
+  
+  <!-- プラン選択タブ -->
+  <div class="tab-wrap-sumame">
+    <!-- タブコンテンツ -->
+  </div>
+  
+  <!-- アコーディオン式詳細設定 -->
+  <transition name="js-accordion">
+    <div v-show="uiProps.isSumameOpened">
+      <!-- 詳細設定コンポーネント -->
+    </div>
+  </transition>
+</li>
+```
+
+### 3.3 重要なVue機能の使用例
+
+#### 条件付きレンダリング
+```html
+<!-- エラー表示 -->
+<section v-if="uiProps.showError">
+  <p>{{ this.simulationParams.message }}</p>
+</section>
+
+<!-- 商品表示制御 -->
+<li v-show="isSumameDisplayed">
+```
+
+#### 動的クラスバインディング
+```html
+<li v-bind:class="{ 'border-enable': simulationParams.mainTypeCd == constants.MAIN_TYPE_CD_MEDICAL_2022 }">
+```
+
+## 4. Script部分の詳細解析
+
+### 4.1 コンポーネント定義
+```javascript
+export default {
+  components: {
+    GlobalHeader,
+    BirthDateGenderInput,
+    // その他のコンポーネント
+  },
+  data() {
+    return {
+      // リアクティブデータ
+    };
+  },
+  computed: {
+    // 算出プロパティ
+  },
+  methods: {
+    // メソッド
+  },
+  mounted() {
+    // ライフサイクルフック
+  }
+}
+```
+
+### 4.2 データ構造
+```javascript
+data() {
+  return {
+    constants: {
+      // 定数定義
+      MAIN_TYPE_CD_MEDICAL_2022: "206",
+      MIN_FEE_MEDICAL: { monthly: 1000, yearly: 11000 }
+    },
+    simulationParams: {
+      // シミュレーション用パラメータ
+      mainTypeCd: "",
+      fullAge: "-",
+      gender: ""
+    },
+    uiProps: {
+      // UI状態管理
+      showError: false,
+      showProductSelectArea: false
+    }
+  };
+}
+```
+
+### 4.3 算出プロパティ (Computed)
+```javascript
+computed: {
+  // 総保険料の計算
+  totalValue: function () {
+    if (this.simulationParams.mainTypeCd == MainTypeCode.MEDICAL_2022) {
+      return this.applicationValues.sumame;
+    }
+    // 他の商品の場合の処理...
+  },
+  
+  // 最低保険料の計算
+  minimumFee: function () {
+    // 複雑な条件分岐で最低保険料を算出
+  }
+}
+```
+
+### 4.4 主要メソッドの解説
+
+#### 初期化処理
+```javascript
+initData() {
+  // データの初期化
+  this.simulationParams.mainTypeCd = "206";
+  this.applicationValues.sumame = "-";
+  this.uiProps.showError = false;
+}
+```
+
+#### API通信
+```javascript
+moveNext() {
+  // 申込端末情報の取得
+  this.setDevices();
+  
+  // API呼び出し
+  api.post(apiUrl, this.application)
+    .then(() => {
+      // 成功時の処理
+    })
+    .catch((err) => {
+      // エラー処理
+    });
+}
+```
+
+#### UI制御
+```javascript
+sumameAccordionToggle: function () {
+  if (this.simulationParams.mainTypeCd == MainTypeCode.MEDICAL_2022) {
+    this.uiProps.isSumameOpened = !this.uiProps.isSumameOpened;
+  }
+}
+```
+
+## 5. Style部分の解析
+
+### 5.1 レスポンシブデザイン
+```css
+/* PC用スタイル */
+.top-product-list li {
+  width: 100%;
+  margin-bottom: 0.6rem;
+}
+
+/* スマートフォン用スタイル */
+@media screen and (max-width: 767px) {
+  .top-product-list li {
+    margin-top: 0.8rem;
+    font-size: 0.14rem;
+  }
+}
+```
+
+### 5.2 商品別カラーテーマ
+```css
+/* メディカル: 商品選択時の色 */
+.border-enable:nth-child(1) .icon-block {
+  background-color: #00a6ba;
+}
+
+/* セブン: 商品選択時の色 */
+.border-enable:nth-child(3) .icon-block {
+  background-color: #0068b7;
+}
+```
+
+## 6. 重要な機能の実装パターン
+
+### 6.1 商品選択の状態管理
+```javascript
+// 選択状態のチェック
+isSelectCheckedSumame: function () {
+  this.check.sumame = true;
+  this.check.seven = false;
+  // 他の商品をfalseに
+}
+
+// 選択されたプランの取得
+getSelectedPlan: function () {
+  let plan = '01';
+  if (this.check.sumame) {
+    // DOMから選択されたプランを取得
+    for (const element of document.getElementsByName('TAB_sumame')) {
+      if (element.checked) {
+        if (element.id == 'TAB-01') {
+          plan = '02'; // 人気プラン
+        }
+      }
+    }
+  }
+  return plan;
+}
+```
+
+### 6.2 バリデーション処理
+```javascript
+computed: {
+  // 保険料が最低金額を下回っているかチェック
+  isUnderMinFee: function () {
+    return this.totalValue < this.minimumFee;
+  },
+  
+  // 申込み可能状態の判定
+  isApplicationReady() {
+    return this.simulationParams.mainTypeCd && !this.isUnderMinFee;
+  }
+}
+```
+
+### 6.3 エラーハンドリング
+```javascript
+moveNext() {
+  // 最低保険料チェック
+  if (this.isUnderMinFee) {
+    this.modal.errModal = true;
+    return;
+  }
+  
+  // API通信エラー処理
+  api.post(apiUrl, this.application)
+    .catch((err) => {
+      this.simulationParams.message = err.response.data.message;
+      this.uiProps.showError = true;
+    });
+}
+```
+
+## 7. ベストプラクティスと注意点
+
+### 7.1 良い点
+- **コンポーネント分割**: 機能ごとに適切にコンポーネントが分かれている
+- **データバインディング**: Vue.jsの機能を活用した効率的なデータ表示
+- **レスポンシブデザイン**: PC・スマートフォン両対応
+
+### 7.2 改善できる点
+- **メソッドの分割**: 一部のメソッドが長すぎる（例：`moveNext`）
+- **定数管理**: 定数が散在している
+- **エラーハンドリング**: より統一的な方法が望ましい
+
+### 7.3 学習ポイント
+1. **Vue.jsの基本概念**の理解
+2. **大規模アプリケーション**での状態管理
+3. **レスポンシブデザイン**の実装
+4. **API通信**とエラーハンドリング
+
+## 8. 今後の学習指針
+
+### 初級者向け
+- Vue.js公式ドキュメントの基本概念を学習
+- 小さなコンポーネントから実装練習
+
+### 中級者向け
+- Vuex（状態管理）の学習
+- Vue Router（ルーティング）の理解
+- テスト手法の習得
+
+### 上級者向け
+- パフォーマンス最適化
+- TypeScriptとの組み合わせ
+- Vue 3 Composition APIの活用
