@@ -1,0 +1,34 @@
+MySQLでリンゴの売り上げテーブルの全レコードで「リンゴ」を「リンゴ❤」に変更したい場合は、以下のSQLを使用できます：
+
+```sql
+-- 商品名カラムの場合
+UPDATE apple_sales_weekly 
+SET product_name = REPLACE(product_name, 'リンゴ', 'リンゴ❤')
+WHERE product_name LIKE '%リンゴ%';
+
+-- または、複数のカラムで「リンゴ」を置換したい場合
+UPDATE apple_sales_weekly 
+SET 
+    product_name = REPLACE(product_name, 'リンゴ', 'リンゴ❤'),
+    description = REPLACE(description, 'リンゴ', 'リンゴ❤'),
+    notes = REPLACE(notes, 'リンゴ', 'リンゴ❤')
+WHERE product_name LIKE '%リンゴ%' 
+   OR description LIKE '%リンゴ%' 
+   OR notes LIKE '%リンゴ%';
+```
+
+**注意点：**
+1. **バックアップを取る**: 更新前に必ずデータベースのバックアップを取ってください
+2. **テスト実行**: 本番環境で実行する前に、SELECTで対象レコードを確認してください：
+   ```sql
+   SELECT * FROM apple_sales_weekly WHERE product_name LIKE '%リンゴ%';
+   ```
+3. **トランザクション使用**: 安全のためトランザクションを使用することをお勧めします：
+   ```sql
+   START TRANSACTION;
+   UPDATE apple_sales_weekly SET product_name = REPLACE(product_name, 'リンゴ', 'リンゴ❤');
+   -- 結果を確認してから
+   COMMIT; -- または ROLLBACK;
+   ```
+
+実際のテーブル名やカラム名に合わせて調整してください。
