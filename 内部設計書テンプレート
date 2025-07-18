@@ -1,0 +1,104 @@
+# 内部設計書テンプレート
+
+## 1. プログラム処理一覧
+
+| No. | 機能カテゴリ | 画面ID | モジュール名 | 関数名 | 処理内容 |
+|-----|-------------|---------|-------------|---------|----------|
+| 1 | user | U01 | UserRegistration.vue | validateEmail | メールアドレスの形式チェック（正規表現使用） |
+| 2 | user | U01 | UserRegistration.vue | checkDuplicate | 既存ユーザーとの重複チェック（API呼び出し） |
+| 3 | user | U01 | UserRegistration.vue | submitRegistration | ユーザー登録処理の実行とDB保存 |
+| 4 | user | U01 | UserRegistration.vue | showSuccessMessage | 登録完了メッセージの表示 |
+| 5 | user | U01 | UserRegistration.vue | handleError | エラー時の処理とエラーメッセージ表示 |
+
+## 2. 詳細処理仕様
+
+### 2.1 validateEmail関数
+- **入力**: emailアドレス文字列
+- **処理**: 
+  - 正規表現パターンでの形式チェック
+  - 必須入力チェック
+  - 文字数制限チェック（最大100文字）
+- **出力**: 
+  - 成功時: true
+  - 失敗時: false + エラーメッセージ配列
+- **例外処理**: 
+  - 空文字の場合: "メールアドレスを入力してください"
+  - 形式不正の場合: "正しいメールアドレスを入力してください"
+
+### 2.2 checkDuplicate関数
+- **入力**: emailアドレス文字列
+- **処理**:
+  - /api/users/check-duplicate エンドポイント呼び出し
+  - レスポンスの判定
+  - ローディング状態の管理
+- **出力**:
+  - 重複なし: true
+  - 重複あり: false
+- **例外処理**:
+  - API通信エラー: "通信エラーが発生しました"
+  - タイムアウト: "時間内に処理が完了しませんでした"
+
+## 3. エラーハンドリング仕様
+
+### 3.1 入力値エラー
+- バリデーションエラーは即座に画面に表示
+- エラーメッセージは該当フィールドの下に赤文字で表示
+- 複数エラーがある場合は全て表示
+
+### 3.2 システムエラー
+- API通信エラーは画面上部にアラート表示
+- ユーザーに分かりやすいメッセージに変換
+- エラーログはconsole.errorで出力
+
+## 4. 画面遷移仕様
+
+### 4.1 正常フロー
+1. ユーザー情報入力
+2. バリデーション実行
+3. 重複チェック
+4. 登録処理
+5. 完了画面へ遷移
+
+### 4.2 エラーフロー
+- バリデーションエラー: 同画面でエラー表示
+- 重複エラー: 同画面でエラー表示
+- システムエラー: エラーページへ遷移
+
+## 5. データ仕様
+
+### 5.1 入力データ
+```javascript
+{
+  email: "user@example.com",
+  password: "password123",
+  confirmPassword: "password123",
+  name: "田中太郎",
+  birthDate: "1990-01-01"
+}
+```
+
+### 5.2 API仕様
+```javascript
+// 重複チェックAPI
+POST /api/users/check-duplicate
+Request: { email: "user@example.com" }
+Response: { isDuplicate: false }
+
+// ユーザー登録API  
+POST /api/users/register
+Request: { email, password, name, birthDate }
+Response: { userId: 12345, message: "登録完了" }
+```
+
+## 6. 使用ライブラリ・フレームワーク
+
+- Vue.js 3.x
+- Axios (HTTP通信)
+- Vuelidate (バリデーション)
+- Vue Router (画面遷移)
+
+## 7. 備考
+
+- パスワードは暗号化してDBに保存
+- セッション管理はJWTトークンを使用
+- ログイン試行回数の制限あり（5回まで）
