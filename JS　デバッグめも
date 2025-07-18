@@ -1,0 +1,81 @@
+JavaScriptのデバッグについて説明しますね。効果的なデバッグ手法とツールをご紹介します。
+
+## 基本的なデバッグ手法
+
+**console.log()を使った基本デバッグ**
+```javascript
+function calculateTotal(items) {
+    console.log('items:', items); // 入力値を確認
+    let total = 0;
+    for (let item of items) {
+        console.log('processing item:', item); // 各アイテムを確認
+        total += item.price;
+    }
+    console.log('final total:', total); // 最終結果を確認
+    return total;
+}
+```
+
+**より詳細なconsoleメソッド**
+```javascript
+console.warn('警告メッセージ');
+console.error('エラーメッセージ');
+console.table(arrayData); // 配列やオブジェクトを表形式で表示
+console.group('グループ名'); // ログをグループ化
+console.groupEnd();
+```
+
+## ブラウザの開発者ツール
+
+**ブレークポイントの設定**
+- Sources タブでコードの行番号をクリック
+- `debugger;` 文をコードに直接記述
+- 条件付きブレークポイントで特定の条件時のみ停止
+
+**変数の監視**
+```javascript
+// Watch パネルで変数を監視
+let userData = { name: 'John', age: 30 };
+debugger; // ここで停止して userData を確認
+```
+
+## エラーハンドリング
+
+**try-catch文でエラーを捕捉**
+```javascript
+try {
+    let result = riskyOperation();
+    console.log('成功:', result);
+} catch (error) {
+    console.error('エラー詳細:', error.message);
+    console.error('スタックトレース:', error.stack);
+}
+```
+
+**カスタムエラーの作成**
+```javascript
+function validateAge(age) {
+    if (age < 0 || age > 150) {
+        throw new Error(`無効な年齢: ${age}`);
+    }
+    return age;
+}
+```
+
+## 実践的なデバッグテクニック
+
+**関数の実行時間測定**
+```javascript
+console.time('処理時間');
+// 処理を実行
+expensiveOperation();
+console.timeEnd('処理時間');
+```
+
+**オブジェクトの詳細確認**
+```javascript
+const obj = { a: 1, b: { c: 2 } };
+console.log(JSON.stringify(obj, null, 2)); // 整形して表示
+```
+
+何か特定のデバッグ状況や問題があれば、より詳しくアドバイスできます。どのような場面でのデバッグについて知りたいですか？
