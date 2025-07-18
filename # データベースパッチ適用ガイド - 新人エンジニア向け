@@ -1,0 +1,240 @@
+# データベースパッチ適用ガイド - 新人エンジニア向け
+
+## はじめに
+
+データベースのパッチ適用は、システム運用において重要な作業の一つです。この記事では、中断後申込情報更新パッチの適用について、新人エンジニアの皆さんにもわかりやすく解説します。
+
+## 1. パッチとは何か？
+
+**パッチ（Patch）**とは、システムの不具合修正や機能追加のために適用する小さなプログラムやスクリプトのことです。データベースの場合、通常はSQLファイルの形で提供されます。
+
+### パッチが必要になる場面
+- バグの修正
+- データの整合性の修正
+- 新機能追加に伴うデータ構造の変更
+- パフォーマンス改善
+
+## 2. 事前準備（最重要！）
+
+### 2.1 バックアップの取得
+```sql
+-- PostgreSQLの例
+pg_dump -U ユーザー名 -h ホスト名 データベース名 > backup_YYYYMMDD.sql
+
+-- MySQLの例
+mysqldump -u ユーザー名 -p データベース名 > backup_YYYYMMDD.sql
+```
+
+**なぜバックアップが必要？**
+- パッチ適用に失敗した場合の復旧手段
+- 予期しない問題が発生した際の保険
+- 本番環境では特に必須
+
+### 2.2 環境の確認
+- **開発環境**: 開発者が自由に試せる環境
+- **ステージング環境**: 本番環境に近い条件でのテスト環境
+- **本番環境**: 実際のユーザーが使用する環境
+
+**適用順序**: 開発 → ステージング → 本番
+
+### 2.3 影響範囲の把握
+パッチSQLファイルを確認して、以下を把握しましょう：
+- 対象となるテーブル
+- 更新されるデータの範囲
+- 実行時間の予測
+- 他のシステムへの影響
+
+## 3. パッチファイルの確認方法
+
+### 3.1 ファイル名の読み方
+```
+例: 20240715_update_application_info.sql
+    ↓
+    日付_処理内容_対象.sql
+```
+
+### 3.2 SQLファイルの内容確認
+```sql
+-- 典型的なパッチファイルの構造例
+-- ===================================
+-- 申込情報更新パッチ
+-- 作成日: 2024-07-15
+-- 作成者: 田中太郎
+-- 概要: 中断された申込の状態を正常に戻す
+-- ===================================
+
+-- 1. 影響範囲の確認
+SELECT COUNT(*) FROM applications WHERE status = 'interrupted';
+
+-- 2. 実際の更新処理
+UPDATE applications 
+SET status = 'pending',
+    updated_at = NOW()
+WHERE status = 'interrupted' 
+  AND created_at > '2024-07-01';
+
+-- 3. 結果確認
+SELECT COUNT(*) FROM applications WHERE status = 'pending';
+```
+
+## 4. 実行手順
+
+### 4.1 基本的な実行フロー
+```sql
+-- Step 1: トランザクション開始
+BEGIN;
+
+-- Step 2: 現在の状態確認
+SELECT status, COUNT(*) 
+FROM applications 
+GROUP BY status;
+
+-- Step 3: パッチSQLの実行
+-- （移行フォルダのSQLファイル内容をここに貼り付け）
+
+-- Step 4: 結果確認
+SELECT status, COUNT(*) 
+FROM applications 
+GROUP BY status;
+
+-- Step 5: 問題なければコミット
+COMMIT;
+-- 問題があればロールバック
+-- ROLLBACK;
+```
+
+### 4.2 実行時の注意点
+- **一行ずつ実行**: 初心者は全体を一度に実行せず、段階的に実行
+- **結果の確認**: 各ステップで期待通りの結果になっているか確認
+- **ログの保存**: 実行結果や出力をファイルに保存
+
+## 5. よくある問題と対処法
+
+### 5.1 外部キー制約エラー
+```sql
+-- エラー例
+ERROR: update or delete on table "applications" violates foreign key constraint
+
+-- 対処法: 関連テーブルも含めて更新
+UPDATE related_table SET application_id = NEW_ID WHERE application_id = OLD_ID;
+UPDATE applications SET id = NEW_ID WHERE id = OLD_ID;
+```
+
+### 5.2 ロックによる待機
+```sql
+-- 長時間実行されるクエリの確認
+SELECT pid, query, state, query_start 
+FROM pg_stat_activity 
+WHERE state = 'active';
+
+-- 必要に応じてプロセスを終了
+SELECT pg_terminate_backend(pid);
+```
+
+### 5.3 データ型エラー
+```sql
+-- エラー例
+ERROR: column "created_at" is of type timestamp but expression is of type text
+
+-- 対処法: 適切な型変換
+UPDATE applications 
+SET created_at = '2024-07-15'::timestamp 
+WHERE id = 123;
+```
+
+## 6. 実行後の確認作業
+
+### 6.1 データ整合性チェック
+```sql
+-- 申込データの整合性確認
+SELECT 
+    COUNT(*) as total_applications,
+    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count
+FROM applications;
+
+-- 関連テーブルとの整合性確認
+SELECT a.id, a.status, p.payment_status
+FROM applications a
+LEFT JOIN payments p ON a.id = p.application_id
+WHERE a.status = 'completed' AND p.payment_status != 'paid';
+```
+
+### 6.2 アプリケーションの動作確認
+- 申込画面での新規申込テスト
+- 申込一覧画面での表示確認
+- 関連する機能の動作確認
+
+### 6.3 ログ確認
+```bash
+# アプリケーションログの確認
+tail -f /var/log/application.log
+
+# データベースログの確認
+tail -f /var/log/postgresql/postgresql.log
+```
+
+## 7. 緊急時の対応
+
+### 7.1 ロールバック手順
+```sql
+-- トランザクション内での作業の場合
+ROLLBACK;
+
+-- 既にコミットしてしまった場合
+-- 1. バックアップから復旧
+psql -U ユーザー名 -d データベース名 < backup_YYYYMMDD.sql
+
+-- 2. または逆パッチの適用
+-- (元の状態に戻すSQL文を実行)
+```
+
+### 7.2 エスカレーション基準
+以下の場合はすぐに先輩エンジニアに相談：
+- 予期しないエラーが発生
+- 実行時間が予想より大幅に長い
+- データの不整合が発見された
+- アプリケーションに影響が出ている
+
+## 8. チェックリスト
+
+### 実行前チェック
+- [ ] バックアップを取得した
+- [ ] パッチファイルの内容を理解した
+- [ ] 影響範囲を把握した
+- [ ] テスト環境で動作確認した
+- [ ] 実行タイミングを確認した
+
+### 実行中チェック
+- [ ] トランザクションを開始した
+- [ ] 各ステップの結果を確認した
+- [ ] エラーがないことを確認した
+- [ ] 実行ログを保存した
+
+### 実行後チェック
+- [ ] データの整合性を確認した
+- [ ] アプリケーションの動作を確認した
+- [ ] ログにエラーがないことを確認した
+- [ ] 関係者に完了報告をした
+
+## 9. まとめ
+
+データベースパッチの適用は、慎重さと正確性が求められる作業です。特に新人エンジニアの皆さんは、以下の点を心がけてください：
+
+1. **準備を怠らない**: バックアップと事前確認は必須
+2. **段階的に実行**: 一度に全てを実行せず、ステップバイステップで
+3. **記録を残す**: 実行内容とその結果を必ず記録
+4. **わからないことは聞く**: 不明な点は必ず先輩に相談
+5. **慎重かつ迅速に**: 丁寧に作業しつつ、必要以上に時間をかけない
+
+パッチ適用は経験を積むことで上達します。最初は時間がかかっても、正確性を重視して取り組んでください。
+
+## 参考資料
+
+- 社内データベース運用ガイドライン
+- 緊急時対応マニュアル
+- パッチ適用履歴（社内Wiki）
+
+---
+
+**重要**: 本番環境での作業は必ず先輩エンジニアの承認と立ち会いのもとで実施してください。
