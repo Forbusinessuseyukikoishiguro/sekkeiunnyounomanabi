@@ -1,0 +1,545 @@
+# Jestモック完全ガイド - 新人エンジニア向け詳細解説
+
+## 📚 目次
+1. [Jestモックとは？](#jestモックとは)
+2. [なぜモックが必要なのか？](#なぜモックが必要なのか)
+3. [モックの基本概念](#モックの基本概念)
+4. [基本的な使い方](#基本的な使い方)
+5. [実践的な例](#実践的な例)
+6. [よく使うモック機能](#よく使うモック機能)
+7. [ベストプラクティス](#ベストプラクティス)
+8. [よくある間違いと対策](#よくある間違いと対策)
+
+---
+
+## Jestモックとは？
+
+**Jest モック（Mock）** は、テスト時に実際の関数やモジュールを「偽物（ダミー）」に置き換える仕組みです。これにより、テストしたい部分だけを集中して検証できます。
+
+### 🎭 モックの概念図
+
+```
+【実際のコード】
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   あなたの関数   │───▶│   外部API呼び出し │───▶│  データベース   │
+│   (テスト対象)   │    │   (axios.get)    │    │   アクセス      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+
+【テスト時（モック使用）】
+┌─────────────────┐    ┌─────────────────┐    
+│   あなたの関数   │───▶│   モック関数     │    ❌ 実際のAPIは
+│   (テスト対象)   │    │   (偽物)        │       呼ばれない
+└─────────────────┘    └─────────────────┘    
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │  決められた戻り値 │
+                       │  を返す          │
+                       └─────────────────┘
+```
+
+---
+
+## なぜモックが必要なのか？
+
+### 🚫 モックを使わない場合の問題
+
+```
+【問題のあるテスト】
+┌─────────────────┐
+│ テスト実行       │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ 実際のAPI呼び出し │───▶│  外部サーバー    │───▶│  データベース   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+          │                       │                       │
+          ▼                       ▼                       ▼
+    ⏰ 時間がかかる          🌐 ネットワーク依存        💰 費用がかかる
+    🔄 結果が不安定          🔒 認証が必要             ⚠️ データが変更される
+```
+
+### ✅ モックを使った場合の利点
+
+```
+【改善されたテスト】
+┌─────────────────┐
+│ テスト実行       │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐    ┌─────────────────┐
+│ モック関数       │───▶│  予測可能な戻り値 │
+└─────────────────┘    └─────────────────┘
+          │                       │
+          ▼                       ▼
+    ⚡ 高速実行              🎯 確実な結果
+    🔒 外部依存なし          💡 テストに集中
+    💰 コストゼロ            🔄 繰り返し可能
+```
+
+---
+
+## モックの基本概念
+
+### 🎪 モック関数の仕組み
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    モック関数の内部構造                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📝 呼び出し履歴                                            │
+│  ├─ いつ呼ばれたか                                          │
+│  ├─ 何回呼ばれたか                                          │
+│  └─ どんな引数で呼ばれたか                                  │
+│                                                             │
+│  🎭 振る舞い設定                                            │
+│  ├─ 何を返すか (mockReturnValue)                           │
+│  ├─ エラーを投げるか (mockRejectedValue)                   │
+│  └─ 独自の処理をするか (mockImplementation)                │
+│                                                             │
+│  🔍 検証機能                                               │
+│  ├─ 呼ばれたかチェック (toHaveBeenCalled)                  │
+│  ├─ 特定の引数でチェック (toHaveBeenCalledWith)            │
+│  └─ 回数チェック (toHaveBeenCalledTimes)                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 基本的な使い方
+
+### 1️⃣ シンプルなモック関数
+
+```javascript
+// ステップ1: モック関数を作成
+const mockFunction = jest.fn();
+
+// ステップ2: 戻り値を設定
+mockFunction.mockReturnValue('こんにちは');
+
+// ステップ3: 関数を実行
+const result = mockFunction();
+
+// ステップ4: 結果を確認
+console.log(result); // 'こんにちは'
+
+// ステップ5: 呼び出しを検証
+expect(mockFunction).toHaveBeenCalled();
+```
+
+### 📊 フロー図
+
+```
+作成 ────▶ 設定 ────▶ 実行 ────▶ 検証
+ │         │         │         │
+ ▼         ▼         ▼         ▼
+jest.fn() mockReturn 関数呼び出し expect
+         Value()
+```
+
+### 2️⃣ モジュール全体のモック
+
+```javascript
+// axios全体をモックに置き換え
+jest.mock('axios');
+
+// 以降、require('axios')は偽物を返す
+const axios = require('axios');
+
+// モック版のaxios.getを設定
+axios.get.mockResolvedValue({
+  data: { name: 'テストユーザー' }
+});
+```
+
+### 🏗️ モジュールモックの仕組み
+
+```
+【通常の場合】
+require('axios') ────▶ 本物のaxiosライブラリ
+                           │
+                           ▼
+                     実際のHTTPリクエスト
+
+【モック使用時】
+require('axios') ────▶ jest.mock()により
+                      偽物のaxiosに置き換え
+                           │
+                           ▼
+                     設定された戻り値を返す
+```
+
+---
+
+## 実践的な例
+
+### 🎯 ユーザーデータ取得のテスト
+
+#### テスト対象のコード
+```javascript
+// userService.js
+const axios = require('axios');
+
+async function fetchUserData(userId) {
+  try {
+    const response = await axios.get(`/api/users/${userId}`);
+    return {
+      success: true,
+      user: response.data
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+module.exports = { fetchUserData };
+```
+
+#### テストコード（完全版）
+
+```javascript
+// userService.test.js
+const axios = require('axios');
+const { fetchUserData } = require('./userService');
+
+// axios全体をモック
+jest.mock('axios');
+const mockedAxios = axios;
+
+describe('fetchUserData', () => {
+  // 各テスト前にモックをリセット
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('✅ 成功時: ユーザーデータを正しく取得する', async () => {
+    // 📝 Arrange (準備)
+    const mockUserData = { id: 1, name: 'テスト太郎', email: 'test@example.com' };
+    mockedAxios.get.mockResolvedValue({ data: mockUserData });
+
+    // 🎬 Act (実行)
+    const result = await fetchUserData(1);
+
+    // 🔍 Assert (検証)
+    expect(result).toEqual({
+      success: true,
+      user: mockUserData
+    });
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/users/1');
+    expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+  });
+
+  test('❌ 失敗時: エラーを適切に処理する', async () => {
+    // 📝 Arrange (準備)
+    const errorMessage = 'ユーザーが見つかりません';
+    mockedAxios.get.mockRejectedValue(new Error(errorMessage));
+
+    // 🎬 Act (実行)
+    const result = await fetchUserData(999);
+
+    // 🔍 Assert (検証)
+    expect(result).toEqual({
+      success: false,
+      error: errorMessage
+    });
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/users/999');
+  });
+});
+```
+
+### 📈 テスト実行フロー
+
+```
+テスト開始
+    │
+    ▼
+┌─────────────────┐
+│ beforeEach実行   │ ←─ モックをクリア
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ モックの設定     │ ←─ 戻り値やエラーを設定
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ 関数の実行       │ ←─ テスト対象の関数を呼び出し
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ 結果の検証       │ ←─ expect()で結果をチェック
+└─────────┬───────┘
+          │
+          ▼
+    テスト完了
+```
+
+---
+
+## よく使うモック機能
+
+### 🔄 戻り値の設定
+
+```javascript
+const mock = jest.fn();
+
+// 固定値を返す
+mock.mockReturnValue('固定値');
+
+// 1回だけ特定の値を返す
+mock.mockReturnValueOnce('1回目');
+mock.mockReturnValueOnce('2回目');
+mock.mockReturnValue('3回目以降');
+
+// Promise成功時の値
+mock.mockResolvedValue('成功データ');
+
+// Promise失敗時のエラー
+mock.mockRejectedValue(new Error('エラーメッセージ'));
+```
+
+### 📊 戻り値パターンの図解
+
+```
+mockReturnValueOnce('A') ─┐
+mockReturnValueOnce('B') ─┤
+mockReturnValue('C')     ─┘
+                          
+呼び出し順序:
+1回目 → 'A'
+2回目 → 'B'  
+3回目 → 'C'
+4回目 → 'C'
+5回目 → 'C' ...
+```
+
+### 🔍 呼び出し確認
+
+```javascript
+const mock = jest.fn();
+
+// 基本的な確認
+expect(mock).toHaveBeenCalled();           // 呼ばれたか
+expect(mock).toHaveBeenCalledTimes(2);     // 2回呼ばれたか
+expect(mock).toHaveBeenCalledWith('引数'); // 特定の引数で呼ばれたか
+
+// 詳細な確認
+expect(mock).toHaveBeenNthCalledWith(1, '1回目の引数');
+expect(mock).toHaveBeenLastCalledWith('最後の引数');
+```
+
+### 🎭 実装の差し替え
+
+```javascript
+const mock = jest.fn();
+
+// 独自の処理を実装
+mock.mockImplementation((name) => {
+  if (name === 'admin') {
+    return { role: 'administrator' };
+  }
+  return { role: 'user' };
+});
+
+// 非同期処理の実装
+mock.mockImplementation(async (id) => {
+  if (id > 100) {
+    throw new Error('IDが大きすぎます');
+  }
+  return { id, name: `ユーザー${id}` };
+});
+```
+
+---
+
+## ベストプラクティス
+
+### ✅ 良い例
+
+```javascript
+describe('UserService', () => {
+  let userService;
+  let mockAxios;
+
+  beforeEach(() => {
+    // 毎回クリーンな状態から開始
+    jest.clearAllMocks();
+    
+    // 必要なモックを準備
+    mockAxios = {
+      get: jest.fn(),
+      post: jest.fn()
+    };
+    
+    userService = new UserService(mockAxios);
+  });
+
+  test('should fetch user by ID', async () => {
+    // Arrange: テストデータを準備
+    const userId = 123;
+    const expectedUser = { id: 123, name: 'テスト太郎' };
+    mockAxios.get.mockResolvedValue({ data: expectedUser });
+
+    // Act: 実際の処理を実行
+    const result = await userService.getUserById(userId);
+
+    // Assert: 結果を検証
+    expect(result).toEqual(expectedUser);
+    expect(mockAxios.get).toHaveBeenCalledWith(`/users/${userId}`);
+  });
+});
+```
+
+### ❌ 悪い例
+
+```javascript
+// 😱 悪い例: モックをクリアしていない
+test('test1', () => {
+  mockFunction.mockReturnValue('test1');
+  // テスト実行...
+});
+
+test('test2', () => {
+  // 前のテストのモック設定が残っている！
+  // 予期しない動作の原因になる
+});
+
+// 😱 悪い例: 過度なモック
+test('should add numbers', () => {
+  const mockAdd = jest.fn();
+  mockAdd.mockImplementation((a, b) => a + b);
+  
+  // 単純な足し算にモックは不要！
+  expect(mockAdd(2, 3)).toBe(5);
+});
+```
+
+### 🎯 モックを使うべき判断基準
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    モックを使う vs 使わない                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ✅ モックを使うべき場合:                                   │
+│  ├─ 外部API呼び出し                                        │
+│  ├─ データベースアクセス                                   │
+│  ├─ ファイル読み書き                                       │
+│  ├─ 時間に依存する処理 (Date.now() など)                   │
+│  ├─ ランダムな値を生成する処理                             │
+│  └─ 重い計算処理                                           │
+│                                                             │
+│  ❌ モックを使わない方が良い場合:                           │
+│  ├─ 単純な計算関数                                         │
+│  ├─ 文字列操作                                             │
+│  ├─ 配列操作                                               │
+│  ├─ オブジェクトの変換                                     │
+│  └─ 純粋関数（副作用のない関数）                           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## よくある間違いと対策
+
+### 🚨 間違い1: モックの設定忘れ
+
+```javascript
+// ❌ 悪い例
+const mockApi = jest.fn();
+// 戻り値を設定し忘れ！
+
+const result = mockApi();
+console.log(result); // undefined
+
+// ✅ 良い例
+const mockApi = jest.fn();
+mockApi.mockReturnValue({ success: true });
+
+const result = mockApi();
+console.log(result); // { success: true }
+```
+
+### 🚨 間違い2: 非同期モックの誤用
+
+```javascript
+// ❌ 悪い例
+mockFunction.mockReturnValue(Promise.resolve('データ'));
+
+// ✅ 良い例
+mockFunction.mockResolvedValue('データ');
+```
+
+### 🚨 間違い3: モジュールモックのタイミング
+
+```javascript
+// ❌ 悪い例 - importの後にmock
+import axios from 'axios';
+jest.mock('axios'); // 遅すぎる！
+
+// ✅ 良い例 - importの前にmock
+jest.mock('axios');
+import axios from 'axios';
+```
+
+### 🔧 デバッグのコツ
+
+```javascript
+// モックの呼び出し履歴を確認
+console.log(mockFunction.mock.calls);
+// → [['引数1'], ['引数2', '引数3']]
+
+// モックの戻り値履歴を確認
+console.log(mockFunction.mock.results);
+// → [{ type: 'return', value: '戻り値1' }, ...]
+
+// モックがどのように設定されているか確認
+console.log(mockFunction.getMockImplementation());
+```
+
+---
+
+## 📚 まとめ
+
+### 重要なポイント
+
+1. **モックは外部依存を排除するツール** - APIやDBなど、テスト時に呼びたくない処理を置き換える
+
+2. **3つの基本操作を覚える**:
+   - `jest.fn()` でモック関数作成
+   - `mockReturnValue()` で戻り値設定
+   - `expect().toHaveBeenCalled()` で呼び出し確認
+
+3. **必ずクリーンアップする** - `beforeEach()` で `jest.clearAllMocks()`
+
+4. **適切な判断をする** - 何でもモックにしない、本当に必要な時だけ使う
+
+### 学習の進め方
+
+```
+レベル1: 基本のモック関数
+    ↓
+レベル2: モジュールモック
+    ↓  
+レベル3: 非同期処理のモック
+    ↓
+レベル4: 複雑なシナリオ
+    ↓
+レベル5: カスタム実装
+```
+
+モックは最初は難しく感じるかもしれませんが、外部依存を排除して安定したテストを書くための重要な技術です。小さな例から始めて、徐々に慣れていきましょう！
+
+---
+
+*🎉 お疲れさまでした！このガイドを参考に、素晴らしいテストを書いてください！*
