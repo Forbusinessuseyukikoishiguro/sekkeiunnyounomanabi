@@ -1,0 +1,455 @@
+# 🔄 新人エンジニア向け：Vue.js 動的 src 設定の完全解説
+
+```vue
+:src="helpPageSrc" 👈 動的に src を設定
+```
+
+この「動的に設定」が何なのかを、基礎から詳しく解説します！
+
+## 🎯 Step 1: 「静的」vs「動的」の基本概念
+
+### 📌 静的な設定（固定値）
+
+```html
+<!-- 通常のHTML：値が固定 -->
+<iframe src="help.html"></iframe>
+<!--        ↑ いつでも同じファイルを表示 -->
+
+<!-- Vue.js でも静的に設定可能 -->
+<iframe src="\\public\\words_sumame_rabbit.html#qa71"></iframe>
+<!--        ↑ いつでも qa71 セクションを表示 -->
+```
+
+### 🔄 動的な設定（変化する値）
+
+```vue
+<!-- Vue.js：データに基づいて値が変化 -->
+<iframe :src="helpPageSrc"></iframe>
+<!--     ↑ helpPageSrc の値に応じて表示内容が変わる -->
+```
+
+## 🎭 Step 2: 動的設定の実例で理解
+
+### 📋 シナリオ：複数のヘルプボタン
+
+```vue
+<template>
+  <div class="insurance-form">
+    <!-- 入院給付金のヘルプボタン -->
+    <button @click="showHelp('qa71')">入院給付金の？</button>
+    
+    <!-- 特定疾病のヘルプボタン -->
+    <button @click="showHelp('qa72')">特定疾病の？</button>
+    
+    <!-- 新規特約のヘルプボタン -->
+    <button @click="showHelp('qa92')">新規特約の？</button>
+
+    <!-- 🎯 重要：1つの iframe で全てに対応 -->
+    <div v-if="showModal" class="modal">
+      <iframe :src="helpPageSrc"></iframe>
+      <!--    ↑ どのボタンが押されたかで内容が変わる -->
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      showModal: false,
+      helpPageSrc: ''  // 👈 この値が動的に変化する
+    }
+  },
+  methods: {
+    showHelp(sectionId) {
+      // 👈 ボタンに応じて src を動的に設定
+      this.helpPageSrc = `\\public\\words_sumame_rabbit.html#${sectionId}`
+      this.showModal = true
+    }
+  }
+}
+</script>
+```
+
+## ⚡ Step 3: 動的変化の詳細プロセス
+
+### 🔄 ユーザーが「入院給付金の？」ボタンを押した場合
+
+```javascript
+// 1. ユーザーアクション
+ユーザー: 「入院給付金の？」ボタンをクリック
+↓
+// 2. Vue.js メソッド実行
+showHelp('qa71') が呼び出される
+↓
+// 3. データ更新
+this.helpPageSrc = '\\public\\words_sumame_rabbit.html#qa71'
+↓
+// 4. Vue.js が自動的にHTML更新
+<iframe :src="helpPageSrc"></iframe>
+が
+<iframe src="\\public\\words_sumame_rabbit.html#qa71"></iframe>
+に変換される
+↓
+// 5. ブラウザで表示
+入院給付金の説明セクションが表示される
+```
+
+### 🔄 ユーザーが「新規特約の？」ボタンを押した場合
+
+```javascript
+// 1. ユーザーアクション  
+ユーザー: 「新規特約の？」ボタンをクリック
+↓
+// 2. Vue.js メソッド実行
+showHelp('qa92') が呼び出される
+↓
+// 3. データ更新（同じ変数、違う値）
+this.helpPageSrc = '\\public\\words_sumame_rabbit.html#qa92'
+↓
+// 4. Vue.js が自動的にHTML更新
+<iframe :src="helpPageSrc"></iframe>
+が
+<iframe src="\\public\\words_sumame_rabbit.html#qa92"></iframe>
+に変換される
+↓
+// 5. ブラウザで表示
+新規特約の説明セクションが表示される
+```
+
+## 🎨 Step 4: Vue.js のデータバインディング詳細
+
+### 📊 Vue.js のリアクティブシステム
+
+```vue
+<script>
+export default {
+  data() {
+    return {
+      helpPageSrc: ''  // 👈 Vue.js が監視している変数
+    }
+  },
+  methods: {
+    showHelp(sectionId) {
+      // このタイミングで値を変更
+      this.helpPageSrc = `\\public\\words_sumame_rabbit.html#${sectionId}`
+      //    ↑ Vue.js が変更を検知 → 自動でHTML更新
+    }
+  }
+}
+</script>
+```
+
+### 🔍 `:src` の仕組み詳細
+
+```vue
+<!-- v-bind:src の省略記法が :src -->
+<iframe v-bind:src="helpPageSrc"></iframe>
+<iframe :src="helpPageSrc"></iframe>  👈 同じ意味
+
+<!-- Vue.js の内部処理 -->
+helpPageSrc の値が変わったら
+→ iframe の src 属性を新しい値に更新
+→ ブラウザが新しいページを読み込み
+```
+
+## 📊 Step 5: 静的 vs 動的の比較
+
+### ❌ 静的な方法（非効率）
+
+```vue
+<template>
+  <div class="modal">
+    <!-- 各セクション用に個別の iframe が必要 -->
+    <iframe 
+      v-if="showSection71" 
+      src="\\public\\words_sumame_rabbit.html#qa71">
+    </iframe>
+    
+    <iframe 
+      v-if="showSection72" 
+      src="\\public\\words_sumame_rabbit.html#qa72">
+    </iframe>
+    
+    <iframe 
+      v-if="showSection92" 
+      src="\\public\\words_sumame_rabbit.html#qa92">
+    </iframe>
+    
+    <!-- セクションが増えるたびに iframe が増加... -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      showSection71: false,
+      showSection72: false,
+      showSection92: false,
+      // セクションが増えるたびに変数が増加...
+    }
+  }
+}
+</script>
+```
+
+### ✅ 動的な方法（効率的）
+
+```vue
+<template>
+  <div class="modal">
+    <!-- 1つの iframe で全セクションに対応 -->
+    <iframe :src="helpPageSrc"></iframe>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      helpPageSrc: ''  // 1つの変数だけ
+    }
+  },
+  methods: {
+    showHelp(sectionId) {
+      // どのセクションでも対応可能
+      this.helpPageSrc = `\\public\\words_sumame_rabbit.html#${sectionId}`
+    }
+  }
+}
+</script>
+```
+
+## 🎮 Step 6: 実際の動作例（詳細版）
+
+### 🕐 時系列での変化
+
+```javascript
+// 初期状態
+helpPageSrc: ''
+<iframe :src=""></iframe>  // 空のiframe
+
+// ↓ ユーザーが「入院給付金？」ボタンクリック
+
+// showHelp('qa71') 実行
+helpPageSrc: '\\public\\words_sumame_rabbit.html#qa71'
+<iframe :src="\\public\\words_sumame_rabbit.html#qa71"></iframe>
+// 👆 入院給付金の説明が表示
+
+// ↓ ユーザーがモーダルを閉じる
+
+// ↓ 後で「新規特約？」ボタンクリック
+
+// showHelp('qa92') 実行
+helpPageSrc: '\\public\\words_sumame_rabbit.html#qa92'
+<iframe :src="\\public\\words_sumame_rabbit.html#qa92"></iframe>
+// 👆 同じiframeで新規特約の説明が表示
+```
+
+## 🛠️ Step 7: より詳細な実装例
+
+### 完全な Vue.js コンポーネント
+
+```vue
+<template>
+  <div class="insurance-form">
+    <!-- 複数のヘルプボタン -->
+    <div class="form-section">
+      <label>入院給付金日額</label>
+      <select>
+        <option>3000円</option>
+        <option>5000円</option>
+      </select>
+      <button 
+        class="help-btn qa71"
+        @click="showHelp('qa71')"
+        data-section="qa71">
+        ？
+      </button>
+    </div>
+
+    <div class="form-section">
+      <label>特定疾病保険料払込免除</label>
+      <select>
+        <option>付加しない</option>
+        <option>付加する</option>
+      </select>
+      <button 
+        class="help-btn qa72"
+        @click="showHelp('qa72')"
+        data-section="qa72">
+        ？
+      </button>
+    </div>
+
+    <div class="form-section">
+      <label>新規がん特約</label>
+      <select>
+        <option>付加しない</option>
+        <option>100万円</option>
+      </select>
+      <button 
+        class="help-btn qa92"
+        @click="showHelp('qa92')"
+        data-section="qa92">
+        ？
+      </button>
+    </div>
+
+    <!-- 動的モーダル -->
+    <div v-if="showModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>{{ modalTitle }}</h3>
+          <button @click="closeModal">×</button>
+        </div>
+        
+        <!-- 🎯 動的 iframe -->
+        <iframe 
+          class="modal-iframe"
+          :src="helpPageSrc"
+          width="600" 
+          height="400">
+        </iframe>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'ProductDetailSumameRabbit',
+  data() {
+    return {
+      showModal: false,
+      helpPageSrc: '',
+      modalTitle: ''
+    }
+  },
+  methods: {
+    showHelp(sectionId) {
+      console.log(`ヘルプボタンクリック: ${sectionId}`)
+      
+      // 📊 セクションIDに基づいてタイトルを動的設定
+      const titles = {
+        'qa71': '入院給付金について',
+        'qa72': '特定疾病保険料払込免除特則について', 
+        'qa92': '新規がん特約について'
+      }
+      
+      // 🔄 動的に値を設定
+      this.modalTitle = titles[sectionId] || 'ヘルプ'
+      this.helpPageSrc = `\\public\\words_sumame_rabbit.html#${sectionId}`
+      this.showModal = true
+      
+      console.log(`設定されたsrc: ${this.helpPageSrc}`)
+    },
+    
+    closeModal() {
+      this.showModal = false
+      this.helpPageSrc = ''  // クリア
+      this.modalTitle = ''
+    }
+  }
+}
+</script>
+```
+
+## 🔍 Step 8: テストでの確認方法
+
+### テストコードでの動的 src 確認
+
+```javascript
+it('動的 src 設定のテスト', async () => {
+  const wrapper = mount(ProductDetailSumameRabbit)
+  
+  // 初期状態：iframe は存在しない
+  expect(wrapper.find('.modal-iframe').exists()).toBe(false)
+  
+  // 入院給付金のヘルプボタンクリック
+  wrapper.find('.qa71').trigger('click')
+  await wrapper.vm.$nextTick()
+  
+  // iframe が作成され、正しい src が設定されていることを確認
+  const iframe1 = wrapper.find('.modal-iframe')
+  expect(iframe1.exists()).toBe(true)
+  expect(iframe1.attributes('src')).toBe('\\public\\words_sumame_rabbit.html#qa71')
+  
+  // モーダルを閉じる
+  wrapper.vm.closeModal()
+  await wrapper.vm.$nextTick()
+  
+  // 今度は新規特約のヘルプボタンクリック
+  wrapper.find('.qa92').trigger('click')
+  await wrapper.vm.$nextTick()
+  
+  // 同じ iframe で異なる src が設定されていることを確認
+  const iframe2 = wrapper.find('.modal-iframe')
+  expect(iframe2.exists()).toBe(true)
+  expect(iframe2.attributes('src')).toBe('\\public\\words_sumame_rabbit.html#qa92')
+  //                                                                   ↑
+  //                                        同じiframeで違うセクションを表示
+})
+```
+
+## ⚡ Step 9: 動的設定のメリット
+
+### 🎯 効率性
+
+```javascript
+// ❌ 静的な場合：100個のセクション = 100個のiframe
+<iframe src="...#qa1"></iframe>
+<iframe src="...#qa2"></iframe>
+// ... 98個のiframe ...
+<iframe src="...#qa100"></iframe>
+
+// ✅ 動的な場合：100個のセクション = 1個のiframe
+<iframe :src="helpPageSrc"></iframe>  // 1つで全てに対応
+```
+
+### 🔧 保守性
+
+```javascript
+// 新しいセクション追加時
+
+// ❌ 静的な場合：テンプレートに新しいiframeを追加
+<iframe v-if="showSection101" src="...#qa101"></iframe>
+
+// ✅ 動的な場合：メソッドの呼び出しだけ
+showHelp('qa101')  // 既存の仕組みで対応可能
+```
+
+## 💡 まとめ：動的 src 設定の5つの重要ポイント
+
+### 1. **🔄 値が変化する仕組み**
+```vue
+:src="helpPageSrc"  // helpPageSrc の値に応じて src が変わる
+```
+
+### 2. **⚡ Vue.js の自動更新**
+```javascript
+this.helpPageSrc = '新しい値'  // データ変更
+→ Vue.js が自動でHTML更新  // 手動操作不要
+```
+
+### 3. **🎯 1つのコンポーネントで複数対応**
+```javascript
+showHelp('qa71')  // 入院給付金
+showHelp('qa72')  // 特定疾病  
+showHelp('qa92')  // 新規特約
+// 全て同じiframeで表示
+```
+
+### 4. **🛡️ テストでの確認**
+```javascript
+expect(iframe.attributes('src')).toBe('期待するパス')
+// ボタンに応じて正しいセクションが設定されているか確認
+```
+
+### 5. **🔧 効率的な開発**
+```
+少ないコード + 高い再利用性 + 簡単な保守 = 動的設定の価値
+```
+
+「動的にsrcを設定」とは、**ユーザーの操作に応じて、同じiframe要素の表示内容を柔軟に変更する仕組み**のことです！
