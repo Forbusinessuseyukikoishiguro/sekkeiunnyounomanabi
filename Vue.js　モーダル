@@ -1,0 +1,186 @@
+🎭 Vue.js Jest ボタンクリック→モーダル表示テスト完全解説
+新人エンジニア向けに、提供コードから実際のモーダルテストの作り方を詳しく解説します！
+
+## 📋 基本的なモーダルテストの構造
+
+### 🎯 テスト全体の流れ
+```javascript
+it('ケース 24-1 入院給付金ボタン：ヘルプボタン押下時', async () => {
+  // 1️⃣ セットアップ（準備）
+  // 2️⃣ ボタンクリック
+  // 3️⃣ モーダル表示確認
+  // 4️⃣ モーダル内容確認
+  // 5️⃣ モーダル閉じる
+  // 6️⃣ モーダル消失確認
+})
+```
+
+## 🔧 Step 1: セットアップ（テスト環境準備）
+
+```javascript
+// ストアモックの作成
+const $store = {
+  getters: jest.fn()  // Vuexストアの代替品
+}
+
+// コンポーネントをマウント（テスト環境で起動）
+const wrapper = mount(ProductDetailSumameRabbit, {
+  mocks: { $store },     // 外部依存をモック化
+  propsData: {           // コンポーネントに必要なデータを渡す
+    application: getApplication(),        // 申込者情報
+    constants: getConstants(),            // システム定数
+    applicationValues: getApplicationValues()  // 保険料初期値
+  }
+})
+
+// 初期化処理
+wrapper.vm.dispPerTimes = jest.fn()  // メソッドをモック化
+wrapper.vm.initDataSumameRabbit()    // コンポーネント初期化
+await wrapper.vm.$nextTick()         // DOM更新完了を待機
+```
+
+**📝 新人向けポイント:**
+- `mount()`: コンポーネントをテスト環境で動かす
+- `mocks`: 外部依存（Vuexなど）の偽物を用意
+- `$nextTick()`: Vue.jsの画面更新が完了するまで待つ
+
+## 🖱️ Step 2: ボタンクリック操作
+
+```javascript
+//ボタン操作
+wrapper.find('.qa71').trigger('click')
+await wrapper.vm.$nextTick()
+```
+
+**📝 詳細解説:**
+- `.qa71`: ヘルプボタンのCSSクラス名
+- `trigger('click')`: クリックイベントを人工的に発生
+- `await $nextTick()`: クリック処理完了まで待機
+
+### 🎨 他のボタンの例
+```javascript
+// 特定疾病保険料払込免除特則ヘルプ
+wrapper.find('.qa72').trigger('click')
+
+// 入院延長特則ヘルプ  
+wrapper.find('.qa73').trigger('click')
+
+// 入院給付金タイプヘルプ
+wrapper.find('.qa74').trigger('click')
+```
+
+## 🖼️ Step 3: モーダル表示確認
+
+```javascript
+const modal = wrapper.find('.modaal-wrapper')
+expect(modal.exists()).toBe(true);    // モーダル要素が存在する
+expect(modal.isVisible()).toBe(true); // モーダルが実際に見える
+```
+
+**📝 詳細解説:**
+- `.modaal-wrapper`: モーダルライブラリの標準クラス
+- `exists()`: HTML要素がDOM上に存在するか
+- `isVisible()`: 要素がCSS的に表示されているか
+
+## 📄 Step 4: モーダル内容確認
+
+```javascript
+//スクロールの確認
+const iframeElement = wrapper.find('.modal-iframe');
+const iframeSrc = iframeElement.attributes('src');
+expect(iframeSrc).toBe('\\public\\words_sumame_rabbit.html#qa71')
+```
+
+**📝 詳細解説:**
+- `.modal-iframe`: モーダル内のiframe要素
+- `attributes('src')`: iframe のsrc属性を取得
+- `#qa71`: HTMLファイル内の特定セクション
+
+### 🗺️ ヘルプボタンとセクションの対応表
+| ボタンクラス | セクション | 内容 |
+|-------------|-----------|------|
+| `.qa71` | `#qa71` | 入院給付金の説明 |
+| `.qa72` | `#qa72` | 特定疾病保険料払込免除特則 |
+| `.qa73` | `#qa73` | 入院延長特則 |
+| `.qa74` | `#qa74` | 入院給付金タイプ |
+| `.qa75` | `#qa75` | 手術給付金・放射線治療給付金 |
+
+## ❌ Step 5: モーダルを閉じる
+
+```javascript
+//closeModalの操作
+wrapper.vm.closeModal()     // モーダル閉じるメソッド実行
+await flushPromises()       // Promise完了まで待機
+await wrapper.vm.$nextTick() // DOM更新完了まで待機
+```
+
+**📝 詳細解説:**
+- `wrapper.vm`: Vueコンポーネントインスタンスにアクセス
+- `closeModal()`: モーダルを閉じるVueメソッド
+- `flushPromises()`: 非同期処理の強制完了
+- **2段階待機**: Promise処理 + Vue.js DOM更新
+
+## ✅ Step 6: モーダル消失確認
+
+```javascript
+const modal2 = wrapper.find('.modaal-wrapper')
+expect(modal2.exists()).toBe(false);  // モーダルが完全に削除された
+```
+
+**📝 重要ポイント:**
+- 再度検索することでクローズ後の状態を確認
+- `exists() = false` でメモリリーク防止を確認
+
+## 🔄 完全なテストパターン（テンプレート）## 🎯 重要なポイントまとめ
+
+### ⚡ 非同期処理の必須パターン
+```javascript
+// ボタンクリック後は必ず待機
+wrapper.find('.qa71').trigger('click')
+await wrapper.vm.$nextTick()  // これを忘れると失敗
+
+// モーダルクローズ時は2段階待機
+wrapper.vm.closeModal()
+await flushPromises()         // Promise完了
+await wrapper.vm.$nextTick()  // DOM更新完了
+```
+
+### 🔍 確認項目チェックリスト
+- ✅ ボタンが存在する（`button.exists()`）
+- ✅ モーダルが表示される（`modal.exists()` + `modal.isVisible()`）
+- ✅ 正しいヘルプページが表示される（`iframeSrc`確認）
+- ✅ モーダルが完全に削除される（`modal2.exists() = false`）
+
+### 🚨 よくあるエラーと対策
+
+**❌ エラー1: 要素が見つからない**
+```javascript
+// ダメな例
+wrapper.find('.nonexistent').trigger('click')  // エラー！
+
+// 正しい例
+const button = wrapper.find('.qa71')
+expect(button.exists()).toBe(true)  // まず存在確認
+button.trigger('click')
+```
+
+**❌ エラー2: 非同期処理待機不足**
+```javascript
+// ダメな例
+wrapper.find('.qa71').trigger('click')
+expect(wrapper.find('.modaal-wrapper').exists()).toBe(true)  // まだ表示されてない
+
+// 正しい例
+wrapper.find('.qa71').trigger('click')
+await wrapper.vm.$nextTick()  // 待機が必要
+expect(wrapper.find('.modaal-wrapper').exists()).toBe(true)
+```
+
+## 🎓 実践のコツ
+
+1. **小さなステップで確認**: 一度にすべてをテストせず、段階的に確認
+2. **デバッグ用ログ活用**: `console.log(wrapper.html())` で構造確認
+3. **エラーメッセージを読む**: テスト失敗時のメッセージをよく確認
+4. **再利用可能なヘルパー作成**: 同じパターンは関数化
+
+このパターンを覚えれば、モーダル表示のテストが自在に書けるようになります！🚀
