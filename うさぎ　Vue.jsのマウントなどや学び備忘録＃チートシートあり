@@ -1,0 +1,5072 @@
+このVue.jsテストファイルを新人エンジニア向けに解説しますね！ステップバイステップで進めていきます。
+
+## 📚 **Step 1: テストファイルの基本構造**
+
+### 1.1 インポート部分
+```javascript
+import { mount, createLocalVue } from '@vue/test-utils'
+import ProductDetailSumameRabbit from '@/components/ProductDetailSumameRabbit.vue'
+import flushPromises from 'flush-promises'
+```
+
+**解説：**
+- `mount`: Vue コンポーネントをテスト用にマウント（仮想的に表示）する関数
+- `createLocalVue`: テスト用の独立したVueインスタンスを作成
+- `flushPromises`: 非同期処理の完了を待つためのユーティリティ
+
+### 1.2 テストの基本構造
+```javascript
+describe('ProductDetailSumameRabbit.vue', () => {
+  it('ケース 28-1 基本保障：表示（20歳）', async () => {
+    // テストの内容
+  })
+})
+```
+
+**解説：**
+- `describe`: テストのグループ化（テストスイート）
+- `it`: 個別のテストケース
+- `async`: 非同期テストを示すキーワード
+
+---
+
+## 📊 **Step 2: テストデータとモック**
+
+### 2.1 テストデータの準備
+```javascript
+const getApplication = () => {
+  const tmp = {
+    mainTypeCd: '206',
+    message: '__vue_devtool_undefined__',
+    birthDate: '1999-1-1',
+    calcBaseDate: '2019-10-01',
+    fullAge: 20,
+    gender: 2,
+    // ... 大量のデータ
+  }
+  return JSON.parse(JSON.stringify(tmp))
+}
+```
+
+**解説：**
+- テスト用のダミーデータを返す関数
+- `JSON.parse(JSON.stringify())`: オブジェクトの深いコピーを作成
+- 実際のAPIから返ってくるデータ構造を模擬
+
+### 2.2 モック（Mock）の概念
+```javascript
+const $store = {
+  getters: jest.fn()
+}
+```
+
+**解説：**
+- `jest.fn()`: Jest（テストフレームワーク）のモック関数
+- 実際のVuexストアの代わりに使用
+- テスト時に外部依存を排除するため
+
+---
+
+## 🔧 **Step 3: コンポーネントのマウント**
+
+### 3.1 基本的なマウント
+```javascript
+const wrapper = mount(ProductDetailSumameRabbit, {
+  mocks: { $store },
+  propsData: {
+    application: getApplication(),
+    constants: getConstants(),
+    applicationValues: getApplicationValues()
+  }
+})
+```
+
+**解説：**
+- `wrapper`: マウントされたコンポーネントのラッパーオブジェクト
+- `mocks`: 依存関係をモックで置き換え
+- `propsData`: コンポーネントに渡すプロパティ
+
+### 3.2 初期化とライフサイクル
+```javascript
+wrapper.vm.dispPerTimes = jest.fn()
+wrapper.vm.initDataSumameRabbit()
+await wrapper.vm.$nextTick()
+```
+
+**解説：**
+- `wrapper.vm`: Vue インスタンスへの直接アクセス
+- `$nextTick()`: DOM更新の完了を待機
+- `await`: 非同期処理の完了を待つ
+
+---
+
+## 🎯 **Step 4: DOMテストの基本**
+
+### 4.1 要素の存在確認
+```javascript
+expect(wrapper.find('.main-contract').text()).toBe('基本保障')
+```
+
+**解説：**
+- `find()`: CSSセレクタで要素を検索
+- `text()`: 要素のテキスト内容を取得
+- `expect().toBe()`: 期待値との一致を検証
+
+### 4.2 プルダウン（select）のテスト
+```javascript
+const selector = wrapper.find('select[name="product_09_01"]').findAll('option')
+expect(selector.exists()).toBe(true)
+expect(selector.length).toBe(8)
+expect(selector.at(0).element.text).toBe('3,000')
+```
+
+**解説：**
+- `findAll()`: 条件に一致する全ての要素を取得
+- `at(index)`: 指定したインデックスの要素を取得
+- `exists()`: 要素が存在するかチェック
+
+---
+
+## ⚡ **Step 5: イベントテスト**
+
+### 5.1 プルダウン変更のテスト
+```javascript
+const plans = wrapper.find('select[name="product_09_01"]').findAll('option')
+plans.filter(node => node.text() == '5,000').at(0).setSelected()
+await wrapper.vm.$nextTick()
+```
+
+**解説：**
+- `filter()`: 条件に一致する要素をフィルタリング
+- `setSelected()`: option要素を選択状態にする
+- イベント発生後は必ず`$nextTick()`で更新を待つ
+
+### 5.2 ボタンクリックのテスト
+```javascript
+wrapper.find('.qa71').trigger('click')
+await wrapper.vm.$nextTick()
+const modal = wrapper.find('.modaal-wrapper')
+expect(modal.exists()).toBe(true)
+expect(modal.isVisible()).toBe(true)
+```
+
+**解説：**
+- `trigger()`: DOMイベントを発火
+- `isVisible()`: 要素が表示されているかチェック
+
+---
+
+## 🔄 **Step 6: 非同期テストパターン**
+
+### 6.1 プルダウン変更による保険料計算テスト
+```javascript
+const expectAmountChangeByPulldownItems = (async (wrapper, pulldownItems, options, baseAmount) => {
+  let lastAmount = baseAmount
+  for (const option of options) {
+    const toBeSelected = pulldownItems.filter(node => node.text() == option)
+    expect(toBeSelected.length).toBe(1)
+    toBeSelected.at(0).setSelected()
+    await wrapper.vm.$nextTick()
+    const currentAmount = wrapper.vm.applicationValues.sumameRabbit
+    expect(currentAmount).not.toBe(0)
+    expect(currentAmount).not.toBe(lastAmount)
+    lastAmount = currentAmount
+  }
+  return lastAmount
+})
+```
+
+**解説：**
+- 各選択肢で保険料が変わることを検証
+- `for...of`: 配列をループ処理
+- 前回の金額と異なることを確認
+
+---
+
+## 🧪 **Step 7: モックとスパイの応用**
+
+### 7.1 日付のモック
+```javascript
+beforeEach(() => {
+  const useDate = new Date(2019, 1, 1)
+  const OriginalDate = Date
+  mockDate = jest.spyOn(global, 'Date')
+  mockDate.mockImplementation(arg1 => {
+    return arg1 ? new OriginalDate(arg1) : useDate
+  })
+})
+```
+
+**解説：**
+- `jest.spyOn()`: 既存の関数やオブジェクトを監視
+- `mockImplementation()`: モック関数の実装を定義
+- テスト実行時の日付を固定化
+
+### 7.2 DOM要素のモック
+```javascript
+const dummyElements = {
+  sumameRabbitAccordionTarget: { style: { height: -1 } },
+  sumameRabbitAccordionBody: { clientHeight: 100 }
+}
+jest.spyOn(document, 'getElementById')
+    .mockImplementation((id) => dummyElements[id])
+```
+
+**解説：**
+- `document.getElementById`をモック化
+- 実際のDOM要素の代わりにダミーオブジェクトを返す
+
+---
+
+## 🎨 **Step 8: 実践的なテストパターン**
+
+### 8.1 条件分岐のテスト
+```javascript
+it('ケース 2-2 特定疾病保険料払込免除特則：非表示（81歳）', async () => {
+  let localApplication = getApplication()
+  localApplication.fullAge = 81
+
+  const wrapper = mount(ProductDetailSumameRabbit, {
+    // ... 設定
+  })
+
+  // 年齢制限により非表示になることをテスト
+  const selector = wrapper.find('select[name="product_09_07"]')
+  expect(selector.exists()).toBe(false)
+  expect(elm.find('p').text()).toBe('お客様のご契約年齢では、お取り扱いできません。')
+})
+```
+
+**解説：**
+- 年齢による表示/非表示の切り替えをテスト
+- 条件により要素が存在しないことも検証
+
+### 8.2 モーダル表示のテスト
+```javascript
+it('ケース 24-1 入院給付金ボタン：ヘルプボタン押下時', async () => {
+  wrapper.find('.qa71').trigger('click')
+  await wrapper.vm.$nextTick()
+  
+  const modal = wrapper.find('.modaal-wrapper')
+  expect(modal.exists()).toBe(true)
+  expect(modal.isVisible()).toBe(true)
+  
+  const iframeElement = wrapper.find('.modal-iframe')
+  const iframeSrc = iframeElement.attributes('src')
+  expect(iframeSrc).toBe('\\public\\words_sumame_rabbit.html#qa71')
+  
+  wrapper.vm.closeModal()
+  await flushPromises()
+  const modal2 = wrapper.find('.modaal-wrapper')
+  expect(modal2.exists()).toBe(false)
+})
+```
+
+**解説：**
+- モーダルの開閉をテスト
+- `attributes()`: HTML属性の取得
+- `flushPromises()`: 全ての非同期処理の完了を待機
+
+---
+
+## 📝 **Step 9: テストの書き方のベストプラクティス**
+
+### 9.1 テストケースの命名
+```javascript
+it('ケース 1-1 入院給付金日額：表示（20歳）', async () => {
+```
+
+**ポイント：**
+- 何をテストしているか明確に
+- 条件（年齢など）も記載
+- 一意の識別子を含める
+
+### 9.2 アサーションの書き方
+```javascript
+// ❌ 悪い例
+expect(selector.length > 0).toBe(true)
+
+// ✅ 良い例
+expect(selector.length).toBe(8)
+expect(selector.exists()).toBe(true)
+```
+
+**ポイント：**
+- 具体的な値で検証
+- 意味のあるアサーションを書く
+
+---
+
+## 🚀 **Step 10: 実際にテストを書いてみよう**
+
+### 簡単な例から始める
+```javascript
+// 基本的な表示テスト
+it('コンポーネントが正しく表示される', async () => {
+  const wrapper = mount(MyComponent, {
+    propsData: { title: 'テスト' }
+  })
+  
+  expect(wrapper.find('h1').text()).toBe('テスト')
+})
+
+// イベントテスト
+it('ボタンクリックで値が変わる', async () => {
+  const wrapper = mount(MyComponent)
+  
+  await wrapper.find('button').trigger('click')
+  await wrapper.vm.$nextTick()
+  
+  expect(wrapper.vm.count).toBe(1)
+})
+```
+
+---
+
+## 📋 **重要なポイントまとめ**
+
+1. **非同期処理**: `async/await`と`$nextTick()`を必ず使う
+2. **モック**: 外部依存は必ずモック化する
+3. **具体的なテスト**: 抽象的でなく具体的な値で検証
+4. **テストの独立性**: 各テストは他に依存しない
+5. **可読性**: テスト名と内容を明確に
+
+このような段階的なアプローチで、Vue.jsのテストを理解していけば、効果的なテストが書けるようになります！
+
+ーーーーーーーーーーーーーーーーーーーーーーーー
+# 🎯 **Vue.js @click 完全マスターガイド（新人エンジニア特化）**
+
+## 🚀 **@clickとは？（3秒で理解）**
+
+```html
+<!-- ❌ 普通のHTML（Vue.js無し） -->
+<button onclick="handleClick()">クリック</button>
+
+<!-- ✅ Vue.js の @click -->
+<button @click="handleClick">クリック</button>
+```
+
+**@click = Vue.jsでクリックイベントを簡単に扱う魔法の記法**
+
+---
+
+## 📐 **@click の基本文法図解**
+
+```html
+<button @click="functionName">ボタン</button>
+        ↑       ↑
+        │       └─ 実行したい関数名
+        └─ Vue.js のイベントディレクティブ
+```
+
+### **文法構造の詳細分解**
+
+```
+@click = v-on:click の省略記法
+
+┌─────────────────────────────────┐
+│        完全な書き方              │
+│  <button v-on:click="func">     │
+│           ↓ 省略               │
+│  <button @click="func">         │
+└─────────────────────────────────┘
+```
+
+---
+
+## 🔧 **Step 1: 基本的な@click（一行ずつ解説）**
+
+### **最もシンプルなパターン**
+
+```html
+<template>
+  <!-- テンプレート部分（HTML構造） -->
+  <div>
+  <!-- ↑ ↑
+       │ └─ 閉じタグ
+       └─ 開始タグ（divコンテナ） -->
+    
+    <h1>{{ message }}</h1>
+    <!-- ↑  ↑ ↑       ↑ ↑
+         │  │ │       │ └─ マスタッシュ構文の終了
+         │  │ │       └─ データプロパティ名
+         │  │ └─ マスタッシュ構文の開始（データバインディング）
+         │  └─ h1タグの開始
+         └─ h1タグ（見出し要素） -->
+    
+    <button @click="changeMessage">メッセージ変更</button>
+    <!--    ↑      ↑             ↑
+            │      │             └─ ボタンに表示される文字
+            │      └─ 実行する関数名（引数なし）
+            └─ クリックイベントディレクティブ -->
+  </div>
+</template>
+
+<script>
+export default {
+//↑    ↑
+//│    └─ デフォルトエクスポート（ES6）
+//└─ モジュールエクスポート構文
+
+  data() {
+  //↑   ↑
+  //│   └─ 関数の開始
+  //└─ Vue.js のデータプロパティ定義メソッド
+  
+    return {
+    //↑    ↑
+    //│    └─ オブジェクトリテラルの開始
+    //└─ 戻り値（リアクティブなデータオブジェクト）
+    
+      message: 'こんにちは！'
+      //↑      ↑
+      //│      └─ 初期値（文字列）
+      //└─ データプロパティ名
+    }
+  },
+  
+  methods: {
+  //↑      ↑
+  //│      └─ オブジェクトリテラルの開始
+  //└─ Vue.js のメソッド定義プロパティ
+  
+    changeMessage() {
+    //↑           ↑
+    //│           └─ メソッドの開始
+    //└─ メソッド名（テンプレートで呼び出される）
+    
+      this.message = 'メッセージが変わりました！'
+      //↑  ↑         ↑
+      //│  │         └─ 新しい値
+      //│  └─ データプロパティへの参照
+      //└─ Vue インスタンス（現在のコンポーネント）
+    }
+  }
+}
+</script>
+```
+
+### **実行フロー図解**
+
+```
+【初期状態】
+┌─────────────────────────────────┐
+│     画面表示                    │
+│  ┌─────────────────────────────┐ │
+│  │  こんにちは！               │ │
+│  │  [メッセージ変更]           │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
+
+        ユーザーがボタンクリック
+                ↓
+
+【@click="changeMessage" が発火】
+┌─────────────────────────────────┐
+│   Vue.js 内部処理               │
+│  1. クリックイベントを検知        │
+│  2. changeMessage メソッドを実行  │
+│  3. this.message を更新         │
+│  4. 画面を自動で再レンダリング    │
+└─────────────────────────────────┘
+
+                ↓
+
+【更新後の状態】
+┌─────────────────────────────────┐
+│     画面表示                    │
+│  ┌─────────────────────────────┐ │
+│  │  メッセージが変わりました！   │ │
+│  │  [メッセージ変更]           │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
+```
+
+---
+
+## 🎯 **Step 2: 関数に引数を渡す（詳細解説）**
+
+### **引数付き関数呼び出し**
+
+```html
+<template>
+  <div>
+    <p>現在のカウント: {{ count }}</p>
+    <!--                ↑ ↑     ↑
+                        │ │     └─ データプロパティ
+                        │ └─ マスタッシュ構文
+                        └─ 動的に表示される値 -->
+    
+    <!-- 引数なしパターン -->
+    <button @click="increment">+1</button>
+    <!--    ↑      ↑         ↑
+            │      │         └─ ボタンテキスト
+            │      └─ 関数名（引数なし、()も不要）
+            └─ クリックイベント -->
+    
+    <!-- 引数ありパターン -->
+    <button @click="addNumber(5)">+5</button>
+    <!--    ↑      ↑        ↑ ↑  ↑
+            │      │        │ │  └─ ボタンテキスト
+            │      │        │ └─ 関数呼び出しの終了
+            │      │        └─ 引数（数値の5）
+            │      └─ 関数名（引数付きは()必須）
+            └─ クリックイベント -->
+    
+    <button @click="addNumber(10)">+10</button>
+    <!--    ↑      ↑        ↑  ↑
+            │      │        │  └─ 引数（数値の10）
+            │      │        └─ 関数名
+            │      └─ 同じ関数、異なる引数
+            └─ クリックイベント -->
+    
+    <!-- 文字列引数パターン -->
+    <button @click="showMessage('こんにちは')">挨拶</button>
+    <!--    ↑      ↑           ↑        ↑    ↑
+            │      │           │        │    └─ ボタンテキスト
+            │      │           │        └─ 文字列引数（シングルクォート）
+            │      │           └─ 引数
+            │      └─ 関数名
+            └─ クリックイベント -->
+            
+    <!-- 変数を引数として渡すパターン -->
+    <button @click="multiplyNumber(multiplier)">×{{ multiplier }}</button>
+    <!--    ↑      ↑             ↑          ↑  ↑ ↑          ↑
+            │      │             │          │  │ │          └─ 動的なボタンテキスト
+            │      │             │          │  │ └─ データプロパティ
+            │      │             │          │  └─ マスタッシュ構文
+            │      │             │          └─ ボタンテキスト
+            │      │             └─ データプロパティを引数として渡す
+            │      └─ 関数名
+            └─ クリックイベント -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      count: 0,
+      //↑     ↑
+      //│     └─ 初期値（ゼロ）
+      //└─ カウンター用データプロパティ
+      
+      multiplier: 2
+      //↑         ↑
+      //│         └─ 初期値（2倍）
+      //└─ 乗数用データプロパティ
+    }
+  },
+  
+  methods: {
+    increment() {
+    //↑       ↑
+    //│       └─ 引数なしメソッド
+    //└─ メソッド名
+    
+      this.count++
+      //↑  ↑     ↑
+      //│  │     └─ インクリメント演算子（+1）
+      //│  └─ countプロパティ
+      //└─ このコンポーネントのインスタンス
+    },
+    
+    addNumber(num) {
+    //↑       ↑   ↑
+    //│       │   └─ 引数の終了
+    //│       └─ 引数名（テンプレートから渡される値）
+    //└─ メソッド名
+    
+      this.count += num
+      //↑  ↑      ↑  ↑
+      //│  │      │  └─ 引数で受け取った値
+      //│  │      └─ 加算代入演算子
+      //│  └─ countプロパティ
+      //└─ このコンポーネントのインスタンス
+    },
+    
+    showMessage(text) {
+    //↑         ↑    ↑
+    //│         │    └─ 引数の終了
+    //│         └─ 引数名（文字列を受け取る）
+    //└─ メソッド名
+    
+      alert(text)
+      //↑   ↑
+      //│   └─ 引数で受け取った文字列
+      //└─ ブラウザのアラート表示関数
+    },
+    
+    multiplyNumber(multiplier) {
+    //↑            ↑         ↑
+    //│            │         └─ 引数の終了
+    //│            └─ 引数名（乗数）
+    //└─ メソッド名
+    
+      this.count *= multiplier
+      //↑  ↑      ↑  ↑
+      //│  │      │  └─ 引数で受け取った乗数
+      //│  │      └─ 乗算代入演算子
+      //│  └─ countプロパティ
+      //└─ このコンポーネントのインスタンス
+    }
+  }
+}
+</script>
+```
+
+### **引数渡しの動作図解**
+
+```
+【ボタンクリック時の引数の流れ】
+
+<button @click="addNumber(5)">+5</button>
+                      ↓
+              addNumber メソッド呼び出し
+                      ↓
+┌─────────────────────────────────┐
+│   addNumber(num) {              │
+│     ↑        ↑                │
+│     │        └─ num = 5 が渡される │
+│     └─ メソッド名               │
+│                                │
+│     this.count += num          │
+│                   ↑            │
+│                   └─ 5が加算される │
+└─────────────────────────────────┘
+                      ↓
+                countが更新される
+                      ↓
+                画面が自動更新
+```
+
+---
+
+## 🎯 **Step 3: イベントオブジェクトの扱い（高度な内容）**
+
+### **$event の使い方**
+
+```html
+<template>
+  <div>
+    <!-- イベントオブジェクトを取得するパターン -->
+    <button @click="handleClickEvent($event)">イベント情報取得</button>
+    <!--    ↑      ↑                 ↑       ↑
+            │      │                 │       └─ ボタンテキスト
+            │      │                 └─ 特別な変数（クリックイベントオブジェクト）
+            │      └─ メソッド名
+            └─ クリックイベント -->
+    
+    <!-- 引数と$eventの両方を渡すパターン -->
+    <button @click="handleMixed('ボタン1', $event)">混合パターン</button>
+    <!--    ↑      ↑           ↑         ↑       ↑
+            │      │           │         │       └─ イベントオブジェクト
+            │      │           │         └─ カンマ区切り
+            │      │           └─ 文字列引数
+            │      └─ メソッド名
+            └─ クリックイベント -->
+    
+    <!-- マウス座標を取得するパターン -->
+    <div @click="getMousePosition($event)" class="click-area">
+    <!--  ↑      ↑                 ↑       ↑
+          │      │                 │       └─ CSSクラス
+          │      │                 └─ イベントオブジェクト
+          │      └─ マウス座標取得メソッド
+          └─ divにもクリックイベントを設定可能 -->
+      クリックして座標を取得
+    </div>
+    
+    <p>最後のクリック座標: X={{ lastClickX }}, Y={{ lastClickY }}</p>
+    <!--                    ↑ ↑            ↑  ↑ ↑            ↑
+                            │ │            │  │ │            └─ Y座標データ
+                            │ │            │  │ └─ マスタッシュ構文
+                            │ │            │  └─ カンマとスペース
+                            │ │            └─ X座標データ
+                            │ └─ マスタッシュ構文
+                            └─ 固定テキスト -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      lastClickX: 0,
+      //↑         ↑
+      //│         └─ 初期値
+      //└─ X座標を保存するデータプロパティ
+      
+      lastClickY: 0
+      //↑         ↑
+      //│         └─ 初期値
+      //└─ Y座標を保存するデータプロパティ
+    }
+  },
+  
+  methods: {
+    handleClickEvent(event) {
+    //↑              ↑     ↑
+    //│              │     └─ 引数の終了
+    //│              └─ イベントオブジェクトを受け取る引数
+    //└─ メソッド名
+    
+      console.log('クリックされました！')
+      //↑       ↑   ↑
+      //│       │   └─ 出力する文字列
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      console.log('イベントタイプ:', event.type)
+      //↑       ↑   ↑             ↑     ↑
+      //│       │   │             │     └─ イベントの種類（'click'）
+      //│       │   │             └─ イベントオブジェクトのtypeプロパティ
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      console.log('クリックされた要素:', event.target)
+      //↑       ↑   ↑                 ↑     ↑
+      //│       │   │                 │     └─ クリックされたDOM要素
+      //│       │   │                 └─ イベントオブジェクトのtargetプロパティ
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    handleMixed(text, event) {
+    //↑         ↑     ↑     ↑
+    //│         │     │     └─ 引数の終了
+    //│         │     └─ イベントオブジェクト
+    //│         └─ 文字列引数
+    //└─ メソッド名
+    
+      console.log('受け取ったテキスト:', text)
+      //↑       ↑   ↑                 ↑
+      //│       │   │                 └─ テンプレートから渡された文字列
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      console.log('ボタンのテキスト:', event.target.textContent)
+      //↑       ↑   ↑               ↑     ↑      ↑
+      //│       │   │               │     │      └─ DOM要素のテキスト内容
+      //│       │   │               │     └─ クリックされたDOM要素
+      //│       │   │               └─ イベントオブジェクト
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    getMousePosition(event) {
+    //↑              ↑     ↑
+    //│              │     └─ 引数の終了
+    //│              └─ マウスイベントオブジェクト
+    //└─ メソッド名
+    
+      this.lastClickX = event.clientX
+      //↑  ↑           ↑     ↑
+      //│  │           │     └─ マウスのX座標（ビューポート基準）
+      //│  │           └─ イベントオブジェクト
+      //│  └─ X座標データプロパティ
+      //└─ このコンポーネントのインスタンス
+      
+      this.lastClickY = event.clientY
+      //↑  ↑           ↑     ↑
+      //│  │           │     └─ マウスのY座標（ビューポート基準）
+      //│  │           └─ イベントオブジェクト
+      //│  └─ Y座標データプロパティ
+      //└─ このコンポーネントのインスタンス
+      
+      console.log(`クリック座標: (${this.lastClickX}, ${this.lastClickY})`)
+      //↑       ↑   ↑               ↑                ↑                  ↑
+      //│       │   │               │                │                  └─ テンプレートリテラルの終了
+      //│       │   │               │                └─ Y座標の埋め込み
+      //│       │   │               └─ X座標の埋め込み
+      //│       │   └─ テンプレートリテラル（バッククォート）
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    }
+  }
+}
+</script>
+
+<style>
+.click-area {
+  /*↑
+    └─ CSSクラス名 */
+  
+  width: 300px;
+  /*↑    ↑
+    │    └─ 幅の値
+    └─ 幅プロパティ */
+    
+  height: 200px;
+  /*↑     ↑
+    │     └─ 高さの値
+    └─ 高さプロパティ */
+    
+  border: 2px solid #ccc;
+  /*↑     ↑   ↑     ↑
+    │     │   │     └─ 色（グレー）
+    │     │   └─ 線のスタイル
+    │     └─ 線の太さ
+    └─ 境界線プロパティ */
+    
+  background-color: #f0f0f0;
+  /*↑               ↑
+    │               └─ 背景色（薄いグレー）
+    └─ 背景色プロパティ */
+    
+  cursor: pointer;
+  /*↑     ↑
+    │     └─ ポインター形状
+    └─ カーソルプロパティ */
+}
+</style>
+```
+
+### **イベントオブジェクトの内容図解**
+
+```
+【$event（マウスクリックイベント）の中身】
+
+event = {
+  type: 'click',           ← イベントの種類
+  target: <button>,        ← クリックされた要素
+  clientX: 150,           ← マウスのX座標
+  clientY: 75,            ← マウスのY座標
+  timeStamp: 1234567890,  ← イベント発生時刻
+  preventDefault: f(),    ← デフォルト動作を止める関数
+  stopPropagation: f()    ← イベント伝播を止める関数
+}
+
+【使用例】
+@click="myMethod($event)"
+           ↓
+myMethod(event) {
+  console.log(event.type)     // 'click'
+  console.log(event.clientX)  // 150
+  console.log(event.clientY)  // 75
+}
+```
+
+---
+
+## 🛡️ **Step 4: イベント修飾子（実用テクニック）**
+
+### **基本的な修飾子**
+
+```html
+<template>
+  <div>
+    <!-- .prevent修飾子（デフォルト動作を防ぐ） -->
+    <form @submit.prevent="handleSubmit">
+    <!--  ↑      ↑       ↑
+          │      │       └─ フォーム送信処理メソッド
+          │      └─ prevent修飾子（ページリロードを防ぐ）
+          └─ submitイベント -->
+      
+      <input type="text" v-model="formData" />
+      <!--   ↑     ↑     ↑       ↑
+             │     │     │       └─ バインドするデータ
+             │     │     └─ 双方向データバインディング
+             │     └─ 入力タイプ
+             └─ 入力要素 -->
+             
+      <button type="submit">送信</button>
+      <!--    ↑     ↑      ↑
+              │     │      └─ ボタンテキスト
+              │     └─ submitタイプ（フォーム送信ボタン）
+              └─ ボタン要素 -->
+    </form>
+    
+    <!-- .once修飾子（一度だけ実行） -->
+    <button @click.once="oneTimeAction">一度だけ実行</button>
+    <!--    ↑      ↑    ↑            ↑
+            │      │    │            └─ ボタンテキスト
+            │      │    └─ 一回限りのメソッド
+            │      └─ once修飾子（最初のクリックのみ実行）
+            └─ クリックイベント -->
+    
+    <!-- .stop修飾子（イベント伝播を停止） -->
+    <div @click="parentClick" class="parent">
+    <!--  ↑      ↑           ↑      ↑
+          │      │           │      └─ CSSクラス
+          │      │           └─ 親要素のクリックハンドラー
+          │      └─ 親のクリックイベント
+          └─ 親要素（div） -->
+      
+      親要素
+      <button @click.stop="childClick">子要素</button>
+      <!--    ↑      ↑    ↑          ↑
+              │      │    │          └─ ボタンテキスト
+              │      │    └─ 子要素のクリックハンドラー
+              │      └─ stop修飾子（親への伝播を停止）
+              └─ 子要素のクリックイベント -->
+    </div>
+    
+    <!-- .self修飾子（要素自身がクリックされた時のみ） -->
+    <div @click.self="selfClick" class="self-area">
+    <!--  ↑      ↑    ↑         ↑      ↑
+          │      │    │         │      └─ CSSクラス
+          │      │    │         └─ 自身クリック時のハンドラー
+          │      │    └─ self修飾子（子要素クリック時は発火しない）
+          │      └─ クリックイベント
+          └─ 親要素 -->
+      
+      この領域をクリック
+      <span>この子要素をクリックしても親のイベントは発火しない</span>
+      <!--  ↑
+            └─ 子要素（spanタグ） -->
+    </div>
+    
+    <!-- 複数修飾子の組み合わせ -->
+    <a href="https://example.com" @click.prevent.stop="linkClick">
+    <!-- ↑     ↑                  ↑      ↑       ↑    ↑
+         │     │                  │      │       │    └─ リンククリックハンドラー
+         │     │                  │      │       └─ 複数修飾子の組み合わせ
+         │     │                  │      └─ prevent（リンク遷移を防ぐ）
+         │     │                  └─ クリックイベント
+         │     └─ リンク先URL
+         └─ リンク要素 -->
+      
+      リンクテキスト
+    </a>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      formData: ''
+      //↑       ↑
+      //│       └─ 初期値（空文字）
+      //└─ フォーム入力データ
+    }
+  },
+  
+  methods: {
+    handleSubmit() {
+    //↑         ↑
+    //│         └─ メソッドの開始
+    //└─ フォーム送信処理メソッド
+    
+      console.log('フォームが送信されました:', this.formData)
+      //↑       ↑   ↑                     ↑    ↑
+      //│       │   │                     │    └─ 入力されたデータ
+      //│       │   │                     └─ このコンポーネントのインスタンス
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      // 実際の送信処理をここに書く
+      // API呼び出しなど
+    },
+    
+    oneTimeAction() {
+    //↑           ↑
+    //│           └─ メソッドの開始
+    //└─ 一度だけ実行されるメソッド
+    
+      console.log('このメソッドは一度だけ実行されます')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      alert('一度だけの処理が実行されました！')
+      //↑   ↑
+      //│   └─ アラートメッセージ
+      //└─ ブラウザのアラート表示関数
+    },
+    
+    parentClick() {
+    //↑         ↑
+    //│         └─ メソッドの開始
+    //└─ 親要素クリック時のメソッド
+    
+      console.log('親要素がクリックされました')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    childClick() {
+    //↑        ↑
+    //│        └─ メソッドの開始
+    //└─ 子要素クリック時のメソッド
+    
+      console.log('子要素がクリックされました（親には伝播しません）')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    selfClick() {
+    //↑       ↑
+    //│       └─ メソッドの開始
+    //└─ 自身クリック時のメソッド
+    
+      console.log('div自身がクリックされました')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    linkClick() {
+    //↑       ↑
+    //│       └─ メソッドの開始
+    //└─ リンククリック時のメソッド
+    
+      console.log('リンクがクリックされましたが遷移しません')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    }
+  }
+}
+</script>
+
+<style>
+.parent {
+  /*↑
+    └─ 親要素のCSSクラス */
+  
+  padding: 20px;
+  /*↑      ↑
+    │      └─ 内側余白の値
+    └─ 内側余白プロパティ */
+    
+  border: 1px solid blue;
+  /*↑     ↑   ↑     ↑
+    │     │   │     └─ 青色
+    │     │   └─ 実線
+    │     └─ 線の太さ
+    └─ 境界線プロパティ */
+    
+  background-color: lightblue;
+  /*↑               ↑
+    │               └─ 薄い青色
+    └─ 背景色プロパティ */
+}
+
+.self-area {
+  /*↑
+    └─ 自身クリック領域のCSSクラス */
+  
+  padding: 20px;
+  /*↑      ↑
+    │      └─ 内側余白の値
+    └─ 内側余白プロパティ */
+    
+  border: 1px solid green;
+  /*↑     ↑   ↑     ↑
+    │     │   │     └─ 緑色
+    │     │   └─ 実線
+    │     └─ 線の太さ
+    └─ 境界線プロパティ */
+    
+  background-color: lightgreen;
+  /*↑               ↑
+    │               └─ 薄い緑色
+    └─ 背景色プロパティ */
+}
+</style>
+```
+
+### **修飾子の動作比較図解**
+
+```
+【.prevent修飾子】
+通常のform submit:
+フォーム送信 → ページリロード（望ましくない）
+
+.prevent付き:
+フォーム送信 → リロードなし → Vue.jsメソッド実行
+
+【.stop修飾子】
+通常のイベント伝播:
+子要素クリック → 親要素のイベントも発火
+
+.stop付き:
+子要素クリック → 親要素のイベントは発火しない
+
+【.once修飾子】
+通常:
+クリック → メソッド実行
+クリック → メソッド実行（毎回）
+クリック → メソッド実行
+
+.once付き:
+クリック → メソッド実行
+クリック → 何も起こらない
+クリック → 何も起こらない
+```
+
+---
+
+## 🧪 **Step 5: テストでの@click検証（実装パターン）**
+
+### **基本的なクリックテスト**
+
+```javascript
+import { mount } from '@vue/test-utils'               // Vue Test Utilsライブラリ
+//     ↑ ↑     ↑    ↑
+//     │ │     │    └─ ライブラリのパス
+//     │ │     └─ インポート元
+//     │ └─ 名前付きインポート
+//     └─ ES6インポート構文
+
+import ButtonComponent from '@/components/ButtonComponent.vue'
+//     ↑               ↑    ↑
+//     │               │    └─ コンポーネントファイルのパス
+//     │               └─ from キーワード
+//     └─ デフォルトインポート
+
+describe('ButtonComponent', () => {                   // テストスイート
+//↑       ↑                 ↑
+//│       │                 └─ テストグループの処理
+//│       └─ テストの説明
+//└─ Jest のテストグループ化関数
+
+  let wrapper                                         // ラッパー変数
+  //↑ ↑
+  //│ └─ 変数名
+  //└─ ブロックスコープ変数宣言
+  
+  beforeEach(() => {                                  // 各テスト前に実行
+  //↑         ↑
+  //│         └─ 実行する関数
+  //└─ Jest のライフサイクルフック
+  
+    wrapper = mount(ButtonComponent)                  // コンポーネントをマウント
+    //↑       ↑     ↑
+    //│       │     └─ マウント対象コンポーネント
+    //│       └─ Vue Test Utils のマウント関数
+    //└─ ラッパー変数に結果を代入
+  })
+  
+  afterEach(() => {                                   // 各テスト後に実行
+  //↑        ↑
+  //│        └─ 実行する関数
+  //└─ Jest のライフサイクルフック
+  
+    wrapper.destroy()                                 // メモリクリーンアップ
+    //      ↑
+    //      └─ コンポーネント破棄メソッド
+  })
+  
+  it('ボタンクリックでメッセージが変わる', async () => {
+  //↑ ↑                           ↑      ↑
+  //│ │                           │      └─ 非同期テスト関数
+  //│ │                           └─ async キーワード
+  //│ └─ テストケースの説明
+  //└─ Jest の個別テスト関数
+  
+    // 初期状態の確認
+    expect(wrapper.find('p').text()).toBe('初期メッセージ')
+    //↑    ↑       ↑    ↑   ↑      ↑   ↑
+    //│    │       │    │   │      │   └─ 期待値
+    //│    │       │    │   │      └─ 厳密等価比較マッチャー
+    //│    │       │    │   └─ テキスト取得メソッド
+    //│    │       │    └─ p要素
+    //│    │       └─ DOM要素検索メソッド
+    //│    └─ ラッパーオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // ボタンクリックをシミュレート
+    await wrapper.find('button').trigger('click')
+    //↑   ↑       ↑    ↑        ↑       ↑
+    //│   │       │    │        │       └─ イベント名
+    //│   │       │    │        └─ イベント発火メソッド
+    //│   │       │    └─ button要素
+    //│   │       └─ DOM要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // DOM更新を待機
+    await wrapper.vm.$nextTick()
+    //↑   ↑        ↑  ↑
+    //│   │        │  └─ 次のDOM更新まで待機するメソッド
+    //│   │        └─ Vueインスタンス
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // 変更後の状態を確認
+    expect(wrapper.find('p').text()).toBe('変更されたメッセージ')
+    //↑    ↑       ↑    ↑   ↑      ↑   ↑
+    //│    │       │    │   │      │   └─ 期待値（変更後）
+    //│    │       │    │   │      └─ 厳密等価比較マッチャー
+    //│    │       │    │   └─ テキスト取得メソッド
+    //│    │       │    └─ p要素
+    //│    │       └─ DOM要素検索メソッド
+    //│    └─ ラッパーオブジェクト
+    //└─ Jest のアサーション関数
+  })
+  
+  it('メソッドが正しく呼ばれる', async () => {        // メソッド呼び出しテスト
+    
+    // メソッドをスパイ化（監視）
+    const spy = jest.spyOn(wrapper.vm, 'changeMessage')
+    //    ↑     ↑    ↑     ↑        ↑  ↑
+    //    │     │    │     │        │  └─ 監視対象メソッド名
+    //    │     │    │     │        └─ Vueインスタンス
+    //    │     │    │     └─ ラッパーオブジェクト
+    //    │     │    └─ スパイ作成メソッド
+    //    │     └─ Jest テストフレームワーク
+    //    └─ スパイオブジェクトを格納する変数
+    
+    // ボタンクリック
+    await wrapper.find('button').trigger('click')
+    //↑   ↑       ↑    ↑        ↑       ↑
+    //│   │       │    │        │       └─ クリックイベント
+    //│   │       │    │        └─ イベント発火メソッド
+    //│   │       │    └─ ボタン要素
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // メソッドが呼ばれたことを確認
+    expect(spy).toHaveBeenCalled()
+    //↑    ↑    ↑
+    //│    │    └─ 「呼び出された」ことを確認するマッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    expect(spy).toHaveBeenCalledTimes(1)
+    //↑    ↑    ↑                    ↑
+    //│    │    │                    └─ 期待する呼び出し回数
+    //│    │    └─ 呼び出し回数確認マッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // スパイを復元
+    spy.mockRestore()
+    //  ↑
+    //  └─ スパイの監視を解除するメソッド
+  })
+})
+```
+
+### **引数付きメソッドのテスト**
+
+```javascript
+describe('引数付きクリックテスト', () => {             // テストスイート
+
+  it('引数付きメソッドが正しく呼ばれる', async () => {
+    
+    const wrapper = mount(CounterComponent)           // カウンターコンポーネント
+    //    ↑          ↑     ↑
+    //    │          │     └─ カウンター機能付きコンポーネント
+    //    │          └─ マウント関数
+    //    └─ ラッパー変数
+    
+    // addNumberメソッドをスパイ化
+    const addSpy = jest.spyOn(wrapper.vm, 'addNumber')
+    //    ↑        ↑    ↑     ↑        ↑  ↑
+    //    │        │    │     │        │  └─ 引数付きメソッド名
+    //    │        │    │     │        └─ Vueインスタンス
+    //    │        │    │     └─ ラッパーオブジェクト
+    //    │        │    └─ スパイ作成メソッド
+    //    │        └─ Jest テストフレームワーク
+    //    └─ スパイオブジェクト
+    
+    // +5ボタンをクリック
+    await wrapper.find('button[data-testid="add-5"]').trigger('click')
+    //↑   ↑       ↑    ↑      ↑                     ↑       ↑
+    //│   │       │    │      │                     │       └─ クリックイベント
+    //│   │       │    │      │                     └─ イベント発火
+    //│   │       │    │      └─ テスト用のdata属性で要素特定
+    //│   │       │    └─ button要素
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // メソッドが正しい引数で呼ばれたことを確認
+    expect(addSpy).toHaveBeenCalledWith(5)
+    //↑    ↑      ↑                     ↑
+    //│    │      │                     └─ 期待する引数値
+    //│    │      └─ 特定の引数で呼ばれたことを確認するマッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // +10ボタンをクリック
+    await wrapper.find('button[data-testid="add-10"]').trigger('click')
+    //↑   ↑       ↑    ↑      ↑                      ↑       ↑
+    //│   │       │    │      │                      │       └─ クリックイベント
+    //│   │       │    │      │                      └─ イベント発火
+    //│   │       │    │      └─ テスト用のdata属性で要素特定
+    //│   │       │    └─ button要素
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // 2回目の呼び出しの引数を確認
+    expect(addSpy).toHaveBeenNthCalledWith(2, 10)
+    //↑    ↑      ↑                        ↑  ↑
+    //│    │      │                        │  └─ 期待する引数値
+    //│    │      │                        └─ 何回目の呼び出しか
+    //│    │      └─ N回目の呼び出しで特定引数が使われたかを確認
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // 合計2回呼ばれたことを確認
+    expect(addSpy).toHaveBeenCalledTimes(2)
+    //↑    ↑      ↑                    ↑
+    //│    │      │                    └─ 期待する呼び出し回数
+    //│    │      └─ 呼び出し回数確認マッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    addSpy.mockRestore()                            // スパイ復元
+    //     ↑
+    //     └─ スパイ監視解除メソッド
+  })
+})
+```
+
+---
+
+## 🎯 **Step 6: 実用的な@clickパターン集**
+
+### **条件付きクリック処理**
+
+```html
+<template>
+  <div>
+    <!-- 状態に応じてボタンの動作を変える -->
+    <button 
+      @click="toggleState" 
+      :disabled="isLoading"
+      :class="{ active: isActive }"
+    >
+    <!--↑      ↑           ↑        ↑               ↑
+        │      │           │        │               └─ 条件付きCSSクラス
+        │      │           │        └─ クラスバインディング
+        │      │           └─ ローディング中は無効化
+        │      └─ 状態切り替えメソッド
+        └─ ボタン要素 -->
+      
+      {{ buttonText }}
+      <!--↑           ↑
+          │           └─ 動的なボタンテキスト
+          └─ マスタッシュ構文 -->
+    </button>
+    
+    <!-- 配列の要素をクリックで操作 -->
+    <ul>
+      <li v-for="(item, index) in items" :key="item.id">
+      <!--↑  ↑     ↑      ↑       ↑     ↑    ↑       ↑
+          │  │     │      │       │     │    │       └─ 一意のキー
+          │  │     │      │       │     │    └─ item のid プロパティ
+          │  │     │      │       │     └─ key 属性
+          │  │     │      │       └─ 配列名
+          │  │     │      └─ インデックス（省略可）
+          │  │     └─ 各要素
+          │  └─ ループ構文
+          └─ リスト要素 -->
+        
+        {{ item.name }}
+        <!--↑     ↑
+            │     └─ アイテムの名前プロパティ
+            └─ マスタッシュ構文 -->
+            
+        <button @click="removeItem(index)">削除</button>
+        <!--    ↑      ↑          ↑      ↑
+                │      │          │      └─ ボタンテキスト
+                │      │          └─ インデックスを引数として渡す
+                │      └─ アイテム削除メソッド
+                └─ クリックイベント -->
+                
+        <button @click="editItem(item)">編集</button>
+        <!--    ↑      ↑        ↑     ↑
+                │      │        │     └─ ボタンテキスト
+                │      │        └─ アイテムオブジェクト全体を引数
+                │      └─ アイテム編集メソッド
+                └─ クリックイベント -->
+      </li>
+    </ul>
+    
+    <!-- 確認ダイアログ付きクリック -->
+    <button @click="deleteWithConfirm">危険な削除</button>
+    <!--    ↑      ↑                 ↑
+            │      │                 └─ ボタンテキスト
+            │      └─ 確認付き削除メソッド
+            └─ クリックイベント -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      isActive: false,
+      //↑       ↑
+      //│       └─ 初期状態（非アクティブ）
+      //└─ アクティブ状態管理
+      
+      isLoading: false,
+      //↑        ↑
+      //│        └─ 初期状態（非ローディング）
+      //└─ ローディング状態管理
+      
+      items: [
+      //↑    ↑
+      //│    └─ 配列リテラル開始
+      //└─ アイテム配列
+      
+        { id: 1, name: 'アイテム1' },
+        //↑ ↑    ↑     ↑
+        //│ │    │     └─ アイテム名
+        //│ │    └─ name プロパティ
+        //│ └─ 一意のID
+        //└─ id プロパティ
+        
+        { id: 2, name: 'アイテム2' },
+        { id: 3, name: 'アイテム3' }
+      ]
+    }
+  },
+  
+  computed: {
+    buttonText() {
+    //↑        ↑
+    //│        └─ 算出プロパティ（リアクティブ）
+    //└─ ボタンテキストを動的に決定
+    
+      if (this.isLoading) {
+      //↑ ↑    ↑
+      //│ │    └─ ローディング状態
+      //│ └─ このコンポーネントのインスタンス
+      //└─ 条件分岐
+      
+        return 'ローディング中...'
+        //↑    ↑
+        //│    └─ ローディング中のテキスト
+        //└─ 戻り値
+      }
+      
+      return this.isActive ? 'アクティブ' : '非アクティブ'
+      //↑    ↑    ↑         ↑ ↑          ↑ ↑
+      //│    │    │         │ │          │ └─ false時の値
+      //│    │    │         │ │          └─ 条件演算子の区切り
+      //│    │    │         │ └─ true時の値
+      //│    │    │         └─ 条件演算子の区切り
+      //│    │    └─ アクティブ状態
+      //│    └─ このコンポーネントのインスタンス
+      //└─ 戻り値
+    }
+  },
+  
+  methods: {
+    toggleState() {
+    //↑         ↑
+    //│         └─ メソッドの開始
+    //└─ 状態切り替えメソッド
+    
+      this.isLoading = true
+      //↑  ↑          ↑
+      //│  │          └─ ローディング開始
+      //│  └─ ローディング状態
+      //└─ このコンポーネントのインスタンス
+      
+      // 非同期処理をシミュレート
+      setTimeout(() => {
+      //↑        ↑
+      //│        └─ 遅延実行する関数
+      //└─ ブラウザのタイマー関数
+      
+        this.isActive = !this.isActive
+        //↑  ↑         ↑ ↑    ↑
+        //│  │         │ │    └─ 現在のアクティブ状態
+        //│  │         │ └─ このコンポーネントのインスタンス
+        //│  │         └─ 論理否定演算子（反転）
+        //│  └─ アクティブ状態
+        //└─ このコンポーネントのインスタンス
+        
+        this.isLoading = false
+        //↑  ↑          ↑
+        //│  │          └─ ローディング終了
+        //│  └─ ローディング状態
+        //└─ このコンポーネントのインスタンス
+        
+      }, 1000)
+      //  ↑
+      //  └─ 遅延時間（1000ミリ秒 = 1秒）
+    },
+    
+    removeItem(index) {
+    //↑        ↑     ↑
+    //│        │     └─ 引数の終了
+    //│        └─ 削除対象のインデックス番号
+    //└─ アイテム削除メソッド
+    
+      this.items.splice(index, 1)
+      //↑  ↑     ↑      ↑     ↑
+      //│  │     │      │     └─ 削除する要素数
+      //│  │     │      └─ 削除開始位置
+      //│  │     └─ 配列の要素削除メソッド
+      //│  └─ アイテム配列
+      //└─ このコンポーネントのインスタンス
+    },
+    
+    editItem(item) {
+    //↑      ↑    ↑
+    //│      │    └─ 引数の終了
+    //│      └─ 編集対象のアイテムオブジェクト
+    //└─ アイテム編集メソッド
+    
+      const newName = prompt('新しい名前を入力:', item.name)
+      //    ↑         ↑      ↑                  ↑    ↑
+      //    │         │      │                  │    └─ アイテムの現在名
+      //    │         │      │                  └─ アイテムオブジェクト
+      //    │         │      └─ 初期値として現在の名前を設定
+      //    │         └─ ブラウザの入力ダイアログ
+      //    └─ 入力された新しい名前を格納
+      
+      if (newName && newName.trim()) {
+      //↑ ↑       ↑  ↑       ↑
+      //│ │       │  │       └─ 空白文字を除去するメソッド
+      //│ │       │  └─ 新しい名前
+      //│ │       └─ 論理積演算子
+      //│ └─ 入力された値が存在するか
+      //└─ 条件分岐
+      
+        item.name = newName.trim()
+        //↑  ↑     ↑       ↑
+        //│  │     │       └─ 前後の空白を除去
+        //│  │     └─ 入力された新しい名前
+        //│  └─ アイテムのnameプロパティ
+        //└─ 編集対象のアイテム
+      }
+    },
+    
+    deleteWithConfirm() {
+    //↑               ↑
+    //│               └─ メソッドの開始
+    //└─ 確認付き削除メソッド
+    
+      if (confirm('本当に削除しますか？')) {
+      //↑ ↑       ↑
+      //│ │       └─ 確認メッセージ
+      //│ └─ ブラウザの確認ダイアログ
+      //└─ 条件分岐（OKボタンでtrue）
+      
+        console.log('削除処理を実行します')
+        //↑       ↑   ↑
+        //│       │   └─ ログメッセージ
+        //│       └─ ログ出力メソッド
+        //└─ ブラウザのconsoleオブジェクト
+        
+        // 実際の削除処理をここに書く
+        alert('削除されました')
+        //↑   ↑
+        //│   └─ 完了メッセージ
+        //└─ ブラウザのアラート表示
+      }
+    }
+  }
+}
+</script>
+
+<style>
+.active {
+  /*↑
+    └─ アクティブ状態のCSSクラス */
+  
+  background-color: #4CAF50;
+  /*↑               ↑
+    │               └─ 緑色の背景
+    └─ 背景色プロパティ */
+    
+  color: white;
+  /*↑    ↑
+    │    └─ 白色のテキスト
+    └─ 文字色プロパティ */
+}
+
+button:disabled {
+  /*↑    ↑
+    │    └─ 疑似クラス（無効状態）
+    └─ button要素 */
+  
+  opacity: 0.5;
+  /*↑      ↑
+    │      └─ 半透明（50%）
+    └─ 透明度プロパティ */
+    
+  cursor: not-allowed;
+  /*↑     ↑
+    │     └─ 禁止カーソル
+    └─ カーソルプロパティ */
+}
+</style>
+```
+
+---
+
+## 📊 **@click パフォーマンス図解**
+
+```
+【@click の実行フロー】
+
+ユーザーがボタンをクリック
+         ↓
+ブラウザがclickイベントを発生
+         ↓
+Vue.js がイベントを検知
+         ↓
+@click="methodName" を解析
+         ↓
+該当するメソッドを実行
+         ↓
+メソッド内でデータ変更
+         ↓
+Vue.js がデータ変更を検知
+         ↓
+仮想DOMを再計算
+         ↓
+必要な部分のDOMを更新
+         ↓
+画面に変更が反映される
+
+【処理時間】
+クリック検知: ~1ms
+メソッド実行: 処理による
+DOM更新: ~16ms (60fps)
+```
+
+---
+
+## 🎯 **まとめ：@click マスターチェックリスト**
+
+### **✅ 基本パターン**
+- [ ] `@click="methodName"` - 引数なし
+- [ ] `@click="methodName(arg)"` - 引数あり
+- [ ] `@click="methodName($event)"` - イベント取得
+
+### **✅ 修飾子パターン**
+- [ ] `@click.prevent` - デフォルト動作防止
+- [ ] `@click.stop` - イベント伝播停止
+- [ ] `@click.once` - 一度だけ実行
+- [ ] `@click.self` - 自身のみ反応
+
+### **✅ 実用パターン**
+- [ ] 条件付きクリック処理
+- [ ] 配列操作（追加・削除・編集）
+- [ ] 非同期処理との組み合わせ
+- [ ] 確認ダイアログ付き処理
+
+### **✅ テストパターン**
+- [ ] クリックイベントのシミュレート
+- [ ] メソッド呼び出しの検証
+- [ ] 引数の正確性確認
+- [ ] DOM変更の確認
+
+**覚えておくべき重要ポイント：**
+1. `@click` は `v-on:click` の省略記法
+2. 引数なしの場合は `()` 不要
+3. 引数ありの場合は `()` 必須
+4. `$event` で元のイベントオブジェクト取得可能
+5. 修飾子で動作をカスタマイズ可能
+
+この解説をマスターすれば、Vue.jsでのクリックイベント処理は完璧です！
+
+ーーーーーーーーーーーーー
+`<select v-model="plan" @change="calcAmount()">` を詳しく解説します！この部分は確かに混乱しやすいですね。
+
+## 🔍 **段階的に理解しよう**
+
+### **Step 1: 普通のHTML selectから始める**
+
+```html
+<!-- 普通のHTML（Vue.js無し） -->
+<select>
+  <option value="1">3,000円</option>
+  <option value="2">4,000円</option>
+  <option value="3">5,000円</option>
+</select>
+```
+
+**問題点：**
+- 選択された値をJavaScriptで取得するのが面倒
+- 値が変わった時の処理を手動で書く必要がある
+
+---
+
+### **Step 2: v-model を追加（Vue.jsの魔法！）**
+
+```html
+<select v-model="plan">
+  <option value="1">3,000円</option>
+  <option value="2">4,000円</option>
+  <option value="3">5,000円</option>
+</select>
+```
+
+```javascript
+data() {
+  return {
+    plan: 3  // 初期値：5,000円が選択される
+  }
+}
+```
+
+#### **v-model の役割を図解**
+
+```
+┌─────────────────┐              ┌─────────────────┐
+│   Select要素    │◄────────────►│  data の plan   │
+│  (HTML画面)     │   自動連携    │ (JavaScript変数) │
+└─────────────────┘              └─────────────────┘
+
+ユーザーが選択 ────────► plan の値が自動で変わる
+                      
+plan の値を変更 ────────► Select の選択が自動で変わる
+```
+
+#### **実際の動作例**
+
+```javascript
+// 初期状態
+data() {
+  return {
+    plan: 3  // ← この値が「5,000円」に対応
+  }
+}
+
+// ユーザーが「4,000円」を選択すると...
+// 自動的に plan = 2 に変わる！
+
+// プログラムで this.plan = 1 に変更すると...
+// 自動的に画面で「3,000円」が選択される！
+```
+
+---
+
+### **Step 3: @change を追加（値が変わった時の処理）**
+
+```html
+<select v-model="plan" @change="calcAmount()">
+         ↑              ↑
+         │              └─ 値が変わった瞬間に実行される処理
+         └─ 双方向データバインディング
+```
+
+#### **@change の役割**
+
+```
+ユーザーが選択を変更
+         ↓
+v-model が plan の値を自動更新
+         ↓
+@change が「値が変わった！」を検知
+         ↓
+calcAmount() メソッドを実行
+         ↓
+保険料を再計算
+```
+
+---
+
+## 🎯 **具体的な動作フロー**
+
+### **実際のコード例**
+
+```html
+<template>
+  <div>
+    <p>現在の選択: {{ plan }}</p>
+    <p>保険料: {{ premium }}円</p>
+    
+    <select v-model="plan" @change="calcAmount()">
+      <option value="1">3,000円</option>
+      <option value="2">4,000円</option>
+      <option value="3">5,000円</option>
+    </select>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      plan: 3,        // 初期値
+      premium: 1500   // 保険料
+    }
+  },
+  methods: {
+    calcAmount() {
+      console.log('計算開始！現在のplan:', this.plan);
+      
+      // プランに応じて保険料を計算
+      if (this.plan == 1) {
+        this.premium = 1000;  // 3,000円プランの保険料
+      } else if (this.plan == 2) {
+        this.premium = 1300;  // 4,000円プランの保険料
+      } else if (this.plan == 3) {
+        this.premium = 1500;  // 5,000円プランの保険料
+      }
+      
+      console.log('計算完了！新しい保険料:', this.premium);
+    }
+  }
+}
+</script>
+```
+
+### **ユーザー操作の詳細フロー**
+
+```
+【初期状態】
+画面表示: "5,000円" が選択済み
+plan変数: 3
+保険料: 1500円
+
+     ユーザーが "4,000円" をクリック
+                ↓
+【v-model の動作】
+1. Vue.js が選択変更を検知
+2. plan変数を 3 → 2 に自動変更
+3. 画面表示が "4,000円" に更新
+
+                ↓
+【@change の動作】  
+4. Vue.js が "値が変わった" ことを検知
+5. calcAmount() メソッドを自動実行
+
+                ↓
+【calcAmount() の実行】
+6. this.plan == 2 なので
+7. this.premium = 1300 に設定
+8. 画面の保険料表示が 1500円 → 1300円 に更新
+
+【最終状態】
+画面表示: "4,000円" が選択済み  
+plan変数: 2
+保険料: 1300円
+```
+
+---
+
+## ❓ **よくある疑問**
+
+### **Q1: なぜ v-model と @change 両方必要？**
+
+```html
+<!-- ❌ v-model だけの場合 -->
+<select v-model="plan">
+  <!-- 値は取得できるが、変更時の処理ができない -->
+</select>
+
+<!-- ❌ @change だけの場合 -->
+<select @change="calcAmount()">
+  <!-- 変更は検知できるが、値の管理が面倒 -->
+</select>
+
+<!-- ✅ 両方使う場合 -->
+<select v-model="plan" @change="calcAmount()">
+  <!-- 値の管理も変更時の処理も自動！ -->
+</select>
+```
+
+### **Q2: @change の代わりに @input は使える？**
+
+```html
+<!-- @change: 選択完了時に発火 -->
+<select v-model="plan" @change="calcAmount()">
+
+<!-- @input: 値変更時に即座に発火 -->  
+<select v-model="plan" @input="calcAmount()">
+```
+
+**selectの場合は @change の方が一般的です**
+
+### **Q3: calcAmount() の () は必要？**
+
+```html
+<!-- ✅ 引数なしでメソッド実行 -->
+<select v-model="plan" @change="calcAmount()">
+
+<!-- ✅ こう書いてもOK -->
+<select v-model="plan" @change="calcAmount">
+
+<!-- ✅ 引数ありの場合は () 必須 -->
+<select v-model="plan" @change="calcAmount('premium')">
+```
+
+---
+
+## 🛠️ **実践で試してみよう**
+
+### **簡単な例で動作確認**
+
+```html
+<template>
+  <div>
+    <h3>プラン選択</h3>
+    <select v-model="selectedPlan" @change="updatePremium">
+      <option value="basic">ベーシック</option>
+      <option value="standard">スタンダード</option>
+      <option value="premium">プレミアム</option>
+    </select>
+    
+    <p>選択中: {{ selectedPlan }}</p>
+    <p>月額: {{ monthlyFee }}円</p>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      selectedPlan: 'basic',  // 初期選択
+      monthlyFee: 1000        // 初期料金
+    }
+  },
+  methods: {
+    updatePremium() {
+      // 選択に応じて料金を変更
+      const fees = {
+        basic: 1000,
+        standard: 2000, 
+        premium: 3000
+      };
+      
+      this.monthlyFee = fees[this.selectedPlan];
+      
+      // デバッグ用
+      console.log(`${this.selectedPlan}プランが選択されました。料金: ${this.monthlyFee}円`);
+    }
+  }
+}
+</script>
+```
+
+### **このコードを動かすと...**
+
+1. **初期状態**: "ベーシック"が選択、月額1000円
+2. **"スタンダード"選択**: 自動で月額2000円に変更
+3. **"プレミアム"選択**: 自動で月額3000円に変更
+
+---
+
+## 📋 **重要ポイントまとめ**
+
+| 要素 | 役割 | タイミング |
+|------|------|-----------|
+| `v-model="plan"` | 選択値とデータを自動連携 | 常時 |
+| `@change="calcAmount()"` | 選択変更時の処理実行 | 選択変更時 |
+
+```
+v-model ────► データの管理（何が選ばれているか）
+@change ────► イベントの処理（選択が変わった時の対応）
+```
+
+この組み合わせで、**「選択値の管理」**と**「変更時の処理」**を両方とも自動化できるのがVue.jsの強力な機能です！
+
+理解できましたか？他に疑問があれば遠慮なく聞いてください！
+
+ーーーーーーーーーーーーーーー
+実装モック特化で新人エンジニア向けに解説します！実際にテストを書く時に使えるパターンを中心に説明しますね。
+
+## 🎯 **モックとは何か？（3秒で理解）**
+
+```javascript
+// ❌ 実際のAPI呼び出し（テストで困る）
+const result = await fetch('/api/insurance-rate')
+
+// ✅ モック（偽物のAPI）
+const mockFetch = jest.fn().mockResolvedValue({ rate: 1000 })
+```
+
+**モック = 偽物だけど、テストに必要な最低限の機能を持つもの**
+
+---
+
+## 🛠️ **基本的なモック実装パターン**
+
+### **Pattern 1: 単純な関数モック**
+
+```javascript
+// ❌ 初心者がやりがちな間違い
+const wrapper = mount(Component)
+wrapper.vm.calcAmount() // 実際の計算が実行されてしまう
+
+// ✅ 正しいモック実装
+const wrapper = mount(Component)
+wrapper.vm.calcAmount = jest.fn() // モック化
+wrapper.vm.calcAmount() // 実行されるが、実際の処理はしない
+
+// 検証
+expect(wrapper.vm.calcAmount).toHaveBeenCalled() // 呼ばれたかチェック
+```
+
+### **Pattern 2: 戻り値付きモック**
+
+```javascript
+// 実装例：保険料計算のモック
+describe('保険料計算テスト', () => {
+  it('プラン変更時に保険料が更新される', async () => {
+    const wrapper = mount(ProductDetailSumameRabbit, {
+      propsData: { /* テストデータ */ }
+    })
+    
+    // ✅ 計算メソッドをモック化して戻り値を固定
+    wrapper.vm.calcAmount = jest.fn().mockReturnValue(1500)
+    
+    // プラン変更をシミュレート
+    wrapper.find('select[name="product_09_01"]').setValue('3')
+    await wrapper.vm.$nextTick()
+    
+    // モックが呼ばれたことを確認
+    expect(wrapper.vm.calcAmount).toHaveBeenCalled()
+  })
+})
+```
+
+---
+
+## 🗃️ **Vuexストアのモック（超重要）**
+
+### **Pattern 3: ストアモックの基本**
+
+```javascript
+// ❌ 実際のVuexストアを使う（複雑で壊れやすい）
+import store from '@/store'
+const wrapper = mount(Component, { store })
+
+// ✅ モックストアを使う（シンプルで安定）
+const mockStore = {
+  getters: {
+    'user/isLoggedIn': jest.fn().mockReturnValue(true),
+    'simulation/situation': jest.fn().mockReturnValue({
+      sumameRabbit: {
+        plan: 3,
+        payMethodTimesCode: "01"
+      }
+    })
+  },
+  dispatch: jest.fn(),
+  commit: jest.fn()
+}
+
+const wrapper = mount(Component, {
+  mocks: { $store: mockStore }
+})
+```
+
+### **Pattern 4: getters の動的変更**
+
+```javascript
+it('ログイン状態によって表示が変わる', async () => {
+  const mockStore = {
+    getters: {
+      'user/isLoggedIn': jest.fn()
+    }
+  }
+  
+  const wrapper = mount(Component, {
+    mocks: { $store: mockStore }
+  })
+  
+  // ✅ テスト途中でgetterの戻り値を変更
+  mockStore.getters['user/isLoggedIn'].mockReturnValue(true)
+  await wrapper.vm.$nextTick()
+  expect(wrapper.find('.login-info').exists()).toBe(true)
+  
+  mockStore.getters['user/isLoggedIn'].mockReturnValue(false)
+  await wrapper.vm.$nextTick()
+  expect(wrapper.find('.login-info').exists()).toBe(false)
+})
+```
+
+---
+
+## 📅 **日付・時間のモック（実用的）**
+
+### **Pattern 5: 日付固定パターン**
+
+```javascript
+describe('年齢制限テスト', () => {
+  let mockDate
+  
+  beforeEach(() => {
+    // ✅ 日付を2019/10/1に固定
+    const fixedDate = new Date(2019, 9, 1) // 10月は9（0ベース）
+    mockDate = jest.spyOn(global, 'Date').mockImplementation(() => fixedDate)
+  })
+  
+  afterEach(() => {
+    // ✅ 必ずクリーンアップ
+    mockDate.mockRestore()
+  })
+  
+  it('20歳の場合、全ての特約が表示される', () => {
+    const application = {
+      birthDate: '1999-1-1', // 20歳
+      fullAge: 20
+    }
+    
+    const wrapper = mount(ProductDetailSumameRabbit, {
+      propsData: { application }
+    })
+    
+    expect(wrapper.find('select[name="product_09_07"]').exists()).toBe(true)
+  })
+})
+```
+
+### **Pattern 6: 時間をコントロールするモック**
+
+```javascript
+// 実装例：時間経過のテスト
+it('5秒後にタイムアウトメッセージが表示される', async () => {
+  jest.useFakeTimers() // ✅ 偽のタイマーを使用
+  
+  const wrapper = mount(TimeoutComponent)
+  
+  // 5秒進める
+  jest.advanceTimersByTime(5000)
+  await wrapper.vm.$nextTick()
+  
+  expect(wrapper.find('.timeout-message').exists()).toBe(true)
+  
+  jest.useRealTimers() // ✅ 元に戻す
+})
+```
+
+---
+
+## 🌐 **DOM要素のモック**
+
+### **Pattern 7: getElementById のモック**
+
+```javascript
+describe('アコーディオン機能', () => {
+  beforeEach(() => {
+    // ✅ DOM要素を偽物で用意
+    const mockElements = {
+      sumameRabbitAccordionTarget: {
+        style: { height: '0px' }
+      },
+      sumameRabbitAccordionBody: {
+        clientHeight: 150
+      }
+    }
+    
+    // document.getElementById をモック化
+    jest.spyOn(document, 'getElementById')
+        .mockImplementation((id) => mockElements[id])
+  })
+  
+  it('アコーディオンの高さが正しく設定される', () => {
+    const wrapper = mount(ProductDetailSumameRabbit)
+    wrapper.vm.adjustAccordionHeight()
+    
+    // モックされた要素の高さが変更されたかチェック
+    const target = document.getElementById('sumameRabbitAccordionTarget')
+    expect(target.style.height).toBe('150px')
+  })
+})
+```
+
+---
+
+## 🔄 **API呼び出しのモック**
+
+### **Pattern 8: 非同期処理のモック**
+
+```javascript
+// ✅ API呼び出しをモック化
+global.fetch = jest.fn()
+
+describe('保険料API呼び出し', () => {
+  beforeEach(() => {
+    fetch.mockClear() // 前のテストの影響を除去
+  })
+  
+  it('正常なレスポンスの場合', async () => {
+    // ✅ 成功レスポンスをモック
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ premium: 1500 })
+    })
+    
+    const wrapper = mount(Component)
+    await wrapper.vm.fetchPremium()
+    
+    expect(fetch).toHaveBeenCalledWith('/api/premium', expect.any(Object))
+    expect(wrapper.vm.premium).toBe(1500)
+  })
+  
+  it('エラーレスポンスの場合', async () => {
+    // ✅ エラーレスポンスをモック
+    fetch.mockRejectedValueOnce(new Error('API Error'))
+    
+    const wrapper = mount(Component)
+    await wrapper.vm.fetchPremium()
+    
+    expect(wrapper.find('.error-message').exists()).toBe(true)
+  })
+})
+```
+
+---
+
+## 🎨 **Vue.js特有のモックパターン**
+
+### **Pattern 9: 子コンポーネントのモック**
+
+```javascript
+// ✅ 重いコンポーネントをモック化
+const MockModal = {
+  name: 'Modal',
+  template: '<div class="mock-modal"><slot /></div>',
+  props: ['visible'],
+  methods: {
+    close: jest.fn()
+  }
+}
+
+describe('モーダル表示テスト', () => {
+  it('ヘルプボタンでモーダルが開く', async () => {
+    const wrapper = mount(ProductDetailSumameRabbit, {
+      components: {
+        Modal: MockModal // ✅ 実際のModalコンポーネントを置き換え
+      }
+    })
+    
+    await wrapper.find('.qa71').trigger('click')
+    await wrapper.vm.$nextTick()
+    
+    expect(wrapper.find('.mock-modal').exists()).toBe(true)
+  })
+})
+```
+
+### **Pattern 10: プロパティのモック**
+
+```javascript
+it('プロパティが正しく渡される', () => {
+  // ✅ テスト用のプロパティを準備
+  const mockProps = {
+    application: {
+      fullAge: 25,
+      gender: 2,
+      insuranceRates: [
+        { insuranceCd: '206', amount60: 1000 }
+      ]
+    },
+    constants: {
+      NO_DIVIDEND_DISPLAY_PRICE: 50000
+    },
+    applicationValues: {
+      sumameRabbit: 0
+    }
+  }
+  
+  const wrapper = mount(ProductDetailSumameRabbit, {
+    propsData: mockProps
+  })
+  
+  expect(wrapper.vm.application.fullAge).toBe(25)
+})
+```
+
+---
+
+## 🔍 **モック検証のベストプラクティス**
+
+### **Pattern 11: 呼び出し回数の検証**
+
+```javascript
+it('プラン変更時に計算が1回だけ実行される', async () => {
+  const wrapper = mount(Component)
+  const calcSpy = jest.spyOn(wrapper.vm, 'calcAmount')
+  
+  // プランを変更
+  await wrapper.find('select').setValue('3')
+  
+  // ✅ 1回だけ呼ばれることを確認
+  expect(calcSpy).toHaveBeenCalledTimes(1)
+  
+  calcSpy.mockRestore()
+})
+```
+
+### **Pattern 12: 引数の検証**
+
+```javascript
+it('正しい引数でメソッドが呼ばれる', () => {
+  const wrapper = mount(Component)
+  const mockMethod = jest.fn()
+  wrapper.vm.updateOption = mockMethod
+  
+  wrapper.vm.changePolicy('cancer', 1000)
+  
+  // ✅ 引数が正しいかチェック
+  expect(mockMethod).toHaveBeenCalledWith('cancer', 1000)
+})
+```
+
+---
+
+## 🚀 **実践的なモックテンプレート**
+
+### **完全なテストファイルの例**
+
+```javascript
+import { mount } from '@vue/test-utils'
+import ProductDetail from '@/components/ProductDetail.vue'
+
+describe('ProductDetail.vue', () => {
+  let wrapper
+  let mockProps
+  
+  // ✅ 共通のセットアップ
+  beforeEach(() => {
+    // プロパティのモック
+    mockProps = {
+      application: {
+        fullAge: 30,
+        gender: 2,
+        insuranceRates: []
+      }
+    }
+    
+    // DOM要素のモック
+    const mockElements = {
+      accordionTarget: { style: { height: '0px' } },
+      accordionBody: { clientHeight: 100 }
+    }
+    jest.spyOn(document, 'getElementById')
+        .mockImplementation(id => mockElements[id])
+    
+    // 日付のモック
+    jest.spyOn(Date, 'now').mockReturnValue(1577836800000) // 2020/1/1
+  })
+  
+  // ✅ 各テスト後のクリーンアップ
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.destroy()
+    }
+    jest.restoreAllMocks()
+  })
+  
+  it('基本的な表示テスト', () => {
+    wrapper = mount(ProductDetail, {
+      propsData: mockProps
+    })
+    
+    expect(wrapper.find('.main-contract').text()).toBe('基本保障')
+  })
+  
+  it('プラン変更テスト', async () => {
+    wrapper = mount(ProductDetail, {
+      propsData: mockProps
+    })
+    
+    // メソッドをモック化
+    const calcSpy = jest.spyOn(wrapper.vm, 'calcAmount')
+    
+    await wrapper.find('select').setValue('3')
+    await wrapper.vm.$nextTick()
+    
+    expect(calcSpy).toHaveBeenCalled()
+  })
+})
+```
+
+---
+
+## 📝 **モック実装チェックリスト**
+
+### **✅ やるべきこと**
+- [ ] 外部依存（API、DOM）は必ずモック化
+- [ ] 各テスト後にモックをクリア
+- [ ] 具体的な戻り値を設定
+- [ ] メソッドの呼び出しを検証
+
+### **❌ やってはいけないこと**
+- [ ] 実際のAPIを呼び出す
+- [ ] モックのクリーンアップを忘れる  
+- [ ] 複雑なモックを作りすぎる
+- [ ] モックの戻り値を曖昧にする
+
+### **🎯 モック実装の成功パターン**
+
+```javascript
+// ✅ シンプルで理解しやすい
+const mockStore = { getters: jest.fn() }
+
+// ✅ 目的が明確
+const calcSpy = jest.spyOn(wrapper.vm, 'calcAmount')
+
+// ✅ 確実にクリーンアップ
+afterEach(() => jest.restoreAllMocks())
+```
+
+このパターンを覚えれば、どんな複雑なコンポーネントでもテストが書けるようになります！実際に手を動かして試してみてください。
+
+ーーーーーーーーーーーー
+# 🚀 **Vue.js テストコード チートシート**
+
+## 📋 **基本セットアップ**
+
+```javascript
+import { mount, createLocalVue } from '@vue/test-utils' // テスト用ライブラリ
+import Component from '@/components/Component.vue'      // テスト対象コンポーネント
+import flushPromises from 'flush-promises'              // 非同期処理待機
+
+describe('Component.vue', () => {                        // テストグループ
+  let wrapper                                           // コンポーネントラッパー
+  
+  beforeEach(() => {                                    // 各テスト前実行
+    // 共通セットアップ
+  })
+  
+  afterEach(() => {                                     // 各テスト後実行
+    if (wrapper) wrapper.destroy()                      // メモリクリーンアップ
+    jest.restoreAllMocks()                              // モック復元
+  })
+  
+  it('テスト名', async () => {                          // 個別テスト
+    // テスト内容
+  })
+})
+```
+
+---
+
+## 🎯 **コンポーネントマウント**
+
+```javascript
+// ✅ 基本マウント
+const wrapper = mount(Component, {                      // コンポーネントをDOMにマウント
+  propsData: { prop1: 'value' },                       // 親から渡すプロパティ
+  mocks: { $store: mockStore },                        // Vue インスタンスのモック
+  components: { Modal: MockModal }                     // 子コンポーネントのモック
+})
+
+// ✅ LocalVue使用
+const localVue = createLocalVue()                      // 独立したVueインスタンス
+const wrapper = mount(Component, { localVue })         // 隔離環境でマウント
+```
+
+---
+
+## 🔧 **モック作成パターン**
+
+### **基本モック**
+```javascript
+const mockFn = jest.fn()                               // 空のモック関数
+const mockFnWithReturn = jest.fn().mockReturnValue(42) // 戻り値付きモック
+const mockFnAsync = jest.fn().mockResolvedValue(data)  // 非同期モック(成功)
+const mockFnError = jest.fn().mockRejectedValue(error) // 非同期モック(失敗)
+```
+
+### **メソッドモック**
+```javascript
+wrapper.vm.methodName = jest.fn()                      // メソッドをモック化
+jest.spyOn(wrapper.vm, 'methodName')                   // メソッドを監視
+wrapper.vm.methodName.mockReturnValue(100)             // 戻り値設定
+```
+
+### **Vuexストアモック**
+```javascript
+const mockStore = {                                    // ストアの偽物
+  getters: {                                           // gettersオブジェクト
+    'module/getter': jest.fn().mockReturnValue(true)   // getter関数のモック
+  },
+  dispatch: jest.fn(),                                 // action実行のモック
+  commit: jest.fn()                                    // mutation実行のモック
+}
+```
+
+### **DOM要素モック**
+```javascript
+const mockElements = {                                 // 偽のDOM要素
+  elementId: {                                         // 要素ID
+    style: { height: '0px' },                         // スタイルプロパティ
+    clientHeight: 100                                  // 高さプロパティ
+  }
+}
+jest.spyOn(document, 'getElementById')                 // DOM検索メソッド監視
+    .mockImplementation(id => mockElements[id])        // 偽要素を返すよう置換
+```
+
+### **日付モック**
+```javascript
+const fixedDate = new Date(2019, 9, 1)                // 固定日付作成
+const mockDate = jest.spyOn(global, 'Date')           // Dateコンストラクター監視
+    .mockImplementation(() => fixedDate)               // 常に固定日付を返す
+// テスト後: mockDate.mockRestore()                   // 元に戻す
+```
+
+---
+
+## 🔍 **DOM操作とイベント**
+
+```javascript
+// ✅ 要素検索
+wrapper.find('.class-name')                           // クラス名で検索
+wrapper.find('#element-id')                           // ID で検索
+wrapper.find('select[name="field"]')                  // 属性で検索
+wrapper.findAll('option')                             // 複数要素検索
+
+// ✅ 要素の状態確認
+wrapper.find('.element').exists()                     // 要素が存在するか
+wrapper.find('.element').isVisible()                  // 要素が表示されているか
+wrapper.find('select').attributes().disabled          // disabled属性の確認
+
+// ✅ 要素の値取得
+wrapper.find('.text').text()                          // テキスト内容取得
+wrapper.find('input').element.value                   // input要素の値
+wrapper.find('select').element.selectedIndex          // select要素の選択インデックス
+
+// ✅ イベント発火
+wrapper.find('button').trigger('click')               // クリックイベント発火
+wrapper.find('select').setValue('3')                  // select要素の値設定
+wrapper.find('input').setChecked(true)                // checkbox/radioの設定
+```
+
+---
+
+## ⏱️ **非同期処理**
+
+```javascript
+// ✅ DOM更新待機
+await wrapper.vm.$nextTick()                          // 次のDOM更新まで待機
+
+// ✅ 全Promise完了待機
+await flushPromises()                                  // 全ての非同期処理完了まで待機
+
+// ✅ タイマーモック
+jest.useFakeTimers()                                   // 偽のタイマー使用
+jest.advanceTimersByTime(5000)                        // 5秒進める
+jest.useRealTimers()                                   // 実際のタイマーに戻す
+```
+
+---
+
+## ✅ **アサーション（検証）**
+
+### **基本検証**
+```javascript
+expect(value).toBe(expected)                          // 厳密等価比較
+expect(value).toEqual(expected)                       // 深い等価比較
+expect(value).not.toBe(unexpected)                    // 否定
+expect(array).toHaveLength(3)                         // 配列長さ
+expect(string).toMatch(/pattern/)                     // 正規表現マッチ
+```
+
+### **DOM検証**
+```javascript
+expect(wrapper.find('.class').exists()).toBe(true)    // 要素存在確認
+expect(wrapper.find('.text').text()).toBe('hello')    // テキスト内容確認
+expect(wrapper.findAll('li')).toHaveLength(5)         // 要素数確認
+```
+
+### **関数呼び出し検証**
+```javascript
+expect(mockFn).toHaveBeenCalled()                     // 呼び出された
+expect(mockFn).toHaveBeenCalledTimes(2)               // 2回呼び出された
+expect(mockFn).toHaveBeenCalledWith(arg1, arg2)       // 引数付きで呼び出された
+expect(mockFn).not.toHaveBeenCalled()                 // 呼び出されていない
+```
+
+---
+
+## 🎨 **実用テンプレート**
+
+### **基本表示テスト**
+```javascript
+it('正しく表示される', () => {
+  const wrapper = mount(Component, {                   // コンポーネントマウント
+    propsData: { title: 'Test' }                      // props設定
+  })
+  expect(wrapper.find('h1').text()).toBe('Test')      // 表示内容確認
+})
+```
+
+### **プルダウン変更テスト**
+```javascript
+it('選択変更で値が更新される', async () => {
+  const wrapper = mount(Component)                     // コンポーネントマウント
+  const spy = jest.spyOn(wrapper.vm, 'onChange')      // メソッド監視
+  
+  await wrapper.find('select').setValue('2')          // 値変更
+  await wrapper.vm.$nextTick()                        // DOM更新待機
+  
+  expect(spy).toHaveBeenCalled()                      // メソッド呼び出し確認
+})
+```
+
+### **モーダル表示テスト**
+```javascript
+it('ボタンクリックでモーダル表示', async () => {
+  const wrapper = mount(Component)                     // コンポーネントマウント
+  
+  await wrapper.find('.help-button').trigger('click') // ボタンクリック
+  await wrapper.vm.$nextTick()                        // DOM更新待機
+  
+  expect(wrapper.find('.modal').exists()).toBe(true)  // モーダル表示確認
+})
+```
+
+### **年齢制限テスト**
+```javascript
+it('年齢により表示制御される', () => {
+  const wrapper = mount(Component, {                   // コンポーネントマウント
+    propsData: { 
+      application: { fullAge: 81 }                    // 81歳設定
+    }
+  })
+  expect(wrapper.find('select').exists()).toBe(false) // 要素非表示確認
+  expect(wrapper.find('p').text())                    // エラーメッセージ確認
+    .toBe('お客様のご契約年齢では、お取り扱いできません。')
+})
+```
+
+---
+
+## 🚨 **よくあるエラーと対処法**
+
+```javascript
+// ❌ エラー: Cannot read property 'xxx' of undefined
+// ✅ 対処: propsData で必要データを渡す
+const wrapper = mount(Component, {
+  propsData: { application: { fullAge: 20 } }         // 必要なデータを設定
+})
+
+// ❌ エラー: [Vue warn] Unknown custom element
+// ✅ 対処: 子コンポーネントをモック化
+const wrapper = mount(Component, {
+  components: { ChildComponent: { template: '<div/>' } } // 子コンポーネントのモック
+})
+
+// ❌ エラー: TypeError: Cannot read property 'getElementById'
+// ✅ 対処: DOM要素をモック化
+jest.spyOn(document, 'getElementById')                 // DOM メソッドのモック
+    .mockReturnValue({ style: {} })                   // 偽要素を返す
+```
+
+---
+
+## 📝 **クリーンアップチェックリスト**
+
+```javascript
+afterEach(() => {
+  if (wrapper) wrapper.destroy()                      // ✅ ラッパー破棄
+  jest.restoreAllMocks()                              // ✅ モック復元
+  jest.clearAllMocks()                                // ✅ モック履歴クリア
+  jest.useRealTimers()                                // ✅ タイマー復元
+})
+```
+
+このチートシートがあれば、Vue.jsテストの90%は書けるようになります！
+
+ーーーーーーーーーーーーー
+# 🔄 **Vue.js ライフサイクル完全ガイド（新人エンジニア向け）**
+
+## 🎯 **ライフサイクルとは？（3秒で理解）**
+
+```
+コンポーネントの一生 = 生まれる → 育つ → 死ぬ
+各段階で「やりたいこと」を指定できる = ライフサイクルフック
+```
+
+---
+
+## 📈 **ライフサイクルの全体像**
+
+```
+┌─────────────────┐
+│   コンポーネント   │
+│     作成開始      │
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│    created      │ ← データ準備完了
+│   データ利用可能   │
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│      DOM        │
+│     作成中       │
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│    mounted      │ ← DOM利用可能
+│   DOM操作可能    │
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│   コンポーネント   │ ← データ変更で発火
+│     更新中       │
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│    updated      │ ← 更新完了
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│   destroyed     │ ← 破棄時
+│  クリーンアップ   │
+└─────────────────┘
+```
+
+---
+
+## 🛠️ **主要ライフサイクルフック**
+
+### **created（データ準備完了）**
+```javascript
+export default {
+  data() {
+    return { message: 'Hello' }
+  },
+  created() {
+    // ✅ データ利用可能
+    console.log(this.message)        // 'Hello' が出力される
+    
+    // ✅ API呼び出し
+    this.fetchUserData()             // データ取得開始
+    
+    // ❌ DOM操作不可
+    this.$refs.myButton              // undefined（まだDOMがない）
+  }
+}
+```
+
+**使いどころ：**
+- API呼び出し
+- 初期データ設定
+- イベントリスナー登録
+
+---
+
+### **mounted（DOM作成完了）**
+```javascript
+export default {
+  mounted() {
+    // ✅ DOM操作可能
+    this.$refs.myInput.focus()       // input要素にフォーカス
+    
+    // ✅ 外部ライブラリ初期化
+    this.initChart()                 // Chart.js などの初期化
+    
+    // ✅ イベントリスナー追加
+    window.addEventListener('resize', this.handleResize)
+  }
+}
+```
+
+**使いどころ：**
+- DOM要素の操作
+- 外部ライブラリの初期化
+- サイズ計算
+- フォーカス設定
+
+---
+
+### **updated（更新完了）**
+```javascript
+export default {
+  data() {
+    return { count: 0 }
+  },
+  updated() {
+    // ✅ データ変更後のDOM操作
+    console.log('DOMが更新されました')
+    
+    // ⚠️ 無限ループに注意
+    // this.count++                  // これはダメ！無限更新になる
+  }
+}
+```
+
+**使いどころ：**
+- 更新後のDOM調整
+- スクロール位置調整
+- サードパーティライブラリの更新
+
+---
+
+### **destroyed（破棄時）**
+```javascript
+export default {
+  destroyed() {
+    // ✅ イベントリスナー削除
+    window.removeEventListener('resize', this.handleResize)
+    
+    // ✅ タイマークリア
+    clearInterval(this.timer)
+    
+    // ✅ WebSocket切断
+    this.socket.close()
+  }
+}
+```
+
+**使いどころ：**
+- イベントリスナー削除
+- タイマークリア
+- メモリリーク防止
+
+---
+
+## 🎨 **実用的なパターン**
+
+### **Pattern 1: API呼び出し**
+```javascript
+export default {
+  data() {
+    return {
+      users: [],                     // 初期値
+      loading: true                  // ローディング状態
+    }
+  },
+  
+  async created() {                  // created で API 呼び出し
+    try {
+      this.users = await fetchUsers() // データ取得
+    } catch (error) {
+      console.error(error)           // エラーハンドリング
+    } finally {
+      this.loading = false           // ローディング終了
+    }
+  }
+}
+```
+
+### **Pattern 2: DOM操作**
+```javascript
+export default {
+  mounted() {                        // mounted で DOM 操作
+    // アコーディオンの高さ調整
+    this.$nextTick(() => {           // DOM更新完了後に実行
+      const element = this.$refs.accordion
+      element.style.height = element.scrollHeight + 'px'
+    })
+  }
+}
+```
+
+### **Pattern 3: イベント管理**
+```javascript
+export default {
+  mounted() {                        // イベントリスナー登録
+    window.addEventListener('resize', this.onResize)
+    document.addEventListener('click', this.onClickOutside)
+  },
+  
+  destroyed() {                      // イベントリスナー削除
+    window.removeEventListener('resize', this.onResize)
+    document.removeEventListener('click', this.onClickOutside)
+  },
+  
+  methods: {
+    onResize() {                     // リサイズ処理
+      this.updateLayout()
+    },
+    onClickOutside() {               // 外部クリック処理
+      this.closeModal()
+    }
+  }
+}
+```
+
+---
+
+## 🧪 **テストでのライフサイクル**
+
+### **created のテスト**
+```javascript
+it('created でデータが初期化される', () => {
+  const spy = jest.spyOn(Component.methods, 'fetchData') // メソッドを監視
+  
+  const wrapper = mount(Component)   // マウント時に created が実行される
+  
+  expect(spy).toHaveBeenCalled()     // fetchData が呼ばれたか確認
+})
+```
+
+### **mounted のテスト**
+```javascript
+it('mounted で DOM 操作が実行される', () => {
+  const wrapper = mount(Component)   // マウント
+  
+  // mounted での DOM 操作結果を確認
+  expect(wrapper.find('input').element).toBe(document.activeElement)
+})
+```
+
+### **destroyed のテスト**
+```javascript
+it('destroyed でクリーンアップされる', () => {
+  const spy = jest.spyOn(window, 'removeEventListener')
+  
+  const wrapper = mount(Component)   // マウント
+  wrapper.destroy()                  // 破棄（destroyed が実行される）
+  
+  expect(spy).toHaveBeenCalledWith('resize', expect.any(Function))
+})
+```
+
+---
+
+## ⚡ **パフォーマンス最適化**
+
+### **heavy処理は created で**
+```javascript
+export default {
+  created() {
+    // ✅ 重い計算は早めに開始
+    this.expensiveCalculation()      // 計算開始
+  },
+  
+  mounted() {
+    // ✅ DOM操作は mounted で
+    this.setupUI()                   // UI設定
+  }
+}
+```
+
+### **条件付きライフサイクル**
+```javascript
+export default {
+  created() {
+    if (this.needsData) {            // 条件付きでAPI呼び出し
+      this.fetchData()
+    }
+  },
+  
+  mounted() {
+    if (this.$refs.chart) {          // 要素が存在する場合のみ
+      this.initChart()
+    }
+  }
+}
+```
+
+---
+
+## 🚨 **よくあるミス**
+
+### **❌ やってはいけないこと**
+```javascript
+export default {
+  created() {
+    // ❌ DOM操作（まだDOMがない）
+    this.$refs.button.click()
+    
+    // ❌ イベントリスナー削除し忘れ
+    window.addEventListener('scroll', this.onScroll)
+  },
+  
+  updated() {
+    // ❌ データ変更（無限ループ）
+    this.count++
+  }
+}
+```
+
+### **✅ 正しい書き方**
+```javascript
+export default {
+  created() {
+    // ✅ データ準備
+    this.initializeData()
+  },
+  
+  mounted() {
+    // ✅ DOM操作
+    this.$refs.button.focus()
+    
+    // ✅ イベントリスナー登録
+    window.addEventListener('scroll', this.onScroll)
+  },
+  
+  destroyed() {
+    // ✅ クリーンアップ
+    window.removeEventListener('scroll', this.onScroll)
+  }
+}
+```
+
+---
+
+## 📋 **ライフサイクル選択チャート**
+
+```
+何をしたい？
+    ↓
+┌─────────────────┐
+│   API呼び出し    │ → created
+└─────────────────┘
+
+┌─────────────────┐
+│   DOM操作       │ → mounted
+└─────────────────┘
+
+┌─────────────────┐
+│ イベント登録     │ → mounted
+└─────────────────┘
+
+┌─────────────────┐
+│ 更新後の調整     │ → updated
+└─────────────────┘
+
+┌─────────────────┐
+│ クリーンアップ   │ → destroyed
+└─────────────────┘
+```
+
+---
+
+## 🎯 **まとめ**
+
+| フック | タイミング | 用途 | DOM操作 |
+|--------|-----------|------|---------|
+| `created` | データ準備完了 | API呼び出し | ❌ |
+| `mounted` | DOM作成完了 | DOM操作、初期化 | ✅ |
+| `updated` | データ更新完了 | 更新後の調整 | ✅ |
+| `destroyed` | 破棄時 | クリーンアップ | ❌ |
+
+**覚え方：**
+- `created` = データの準備
+- `mounted` = DOMの準備  
+- `updated` = データの変更
+- `destroyed` = お片付け
+
+このライフサイクルを理解すれば、Vue.jsコンポーネントを適切に管理できるようになります！
+
+ーーーーーーーーーーーー
+# 🎯 **Vue.js DOM操作 × マウント 完全解説（新人エンジニア特化）**
+
+## 🏗️ **基本マウント（一行ずつ解説）**
+
+```javascript
+import { mount } from '@vue/test-utils'               // Vue.jsテスト用ライブラリのインポート
+//     ↑ ↑     ↑    ↑
+//     │ │     │    └─ ライブラリのパス
+//     │ │     └─ インポート元の指定
+//     │ └─ 名前付きインポート（{}で囲む）
+//     └─ ES6のインポート構文
+
+import Component from '@/components/Component.vue'    // テスト対象のVueコンポーネント
+//     ↑         ↑    ↑
+//     │         │    └─ .vueファイルのパス（@はsrcディレクトリ）
+//     │         └─ from キーワード
+//     └─ デフォルトインポート（{}なし）
+
+const wrapper = mount(Component)                      // コンポーネントを仮想DOMにマウント
+//    ↑         ↑     ↑
+//    │         │     └─ マウント対象のコンポーネント
+//    │         └─ Vue Test Utilsのマウント関数
+//    └─ マウント結果を格納する変数（ラッパーオブジェクト）
+```
+
+### **マウント後の状態確認**
+
+```javascript
+console.log(wrapper)                                  // ラッパーオブジェクトの中身を確認
+//          ↑
+//          └─ マウント結果のオブジェクト
+
+console.log(wrapper.html())                          // レンダリングされたHTMLを取得
+//          ↑       ↑
+//          │       └─ HTML文字列を返すメソッド
+//          └─ ラッパーオブジェクト
+
+console.log(wrapper.vm)                              // Vueインスタンスにアクセス
+//          ↑       ↑
+//          │       └─ Vue instance（vm = ViewModel）
+//          └─ ラッパーオブジェクト
+```
+
+---
+
+## 🔍 **DOM要素の検索（詳細解説）**
+
+### **基本的な要素検索**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ クラス名で検索
+const button = wrapper.find('.submit-button')        // クラス名指定で要素を検索
+//    ↑              ↑    ↑
+//    │              │    └─ CSSセレクター（.はクラス名を表す）
+//    │              └─ DOM要素検索メソッド
+//    └─ 見つかった要素を格納する変数
+
+// ✅ ID名で検索  
+const input = wrapper.find('#user-name')             // ID指定で要素を検索
+//    ↑             ↑    ↑
+//    │             │    └─ CSSセレクター（#はIDを表す）
+//    │             └─ DOM要素検索メソッド
+//    └─ 見つかった要素を格納する変数
+
+// ✅ タグ名で検索
+const form = wrapper.find('form')                    // HTMLタグ名で要素を検索
+//    ↑            ↑    ↑
+//    │            │    └─ HTMLタグ名
+//    │            └─ DOM要素検索メソッド
+//    └─ 見つかった要素を格納する変数
+
+// ✅ 属性で検索
+const select = wrapper.find('select[name="plan"]')   // 属性付きセレクターで検索
+//    ↑              ↑    ↑      ↑     ↑
+//    │              │    │      │     └─ 属性値
+//    │              │    │      └─ 属性名
+//    │              │    └─ HTMLタグ名
+//    │              └─ DOM要素検索メソッド
+//    └─ 見つかった要素を格納する変数
+```
+
+### **複数要素の検索**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ 複数要素を全て取得
+const items = wrapper.findAll('.list-item')          // 同じクラス名の要素を全て取得
+//    ↑             ↑       ↑
+//    │             │       └─ CSSセレクター
+//    │             └─ 複数要素検索メソッド（findAllを使用）
+//    └─ 要素の配列を格納する変数
+
+console.log(items.length)                            // 見つかった要素の数を確認
+//          ↑     ↑
+//          │     └─ 配列の長さプロパティ
+//          └─ 要素配列
+
+// ✅ 特定の位置の要素を取得
+const firstItem = items.at(0)                        // 最初の要素を取得
+//    ↑               ↑  ↑
+//    │               │  └─ インデックス番号（0から開始）
+//    │               └─ 指定位置の要素を取得するメソッド
+//    └─ 取得した要素を格納する変数
+
+const lastItem = items.at(-1)                        // 最後の要素を取得（-1で最後を指定）
+//    ↑              ↑  ↑
+//    │              │  └─ 負のインデックス（-1=最後）
+//    │              └─ 指定位置の要素を取得するメソッド
+//    └─ 取得した要素を格納する変数
+```
+
+---
+
+## 📝 **DOM要素の状態確認**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+const button = wrapper.find('.submit-button')        // ボタン要素を取得
+
+// ✅ 要素の存在確認
+const exists = button.exists()                       // 要素が存在するかbooleanで返す
+//    ↑              ↑
+//    │              └─ 存在確認メソッド（true/false）
+//    └─ 結果を格納する変数
+
+console.log(exists)                                  // true または false が出力
+//          ↑
+//          └─ boolean値
+
+// ✅ 要素の表示状態確認
+const isVisible = button.isVisible()                 // 要素が画面に表示されているか確認
+//    ↑                 ↑
+//    │                 └─ 表示確認メソッド（CSS display等を考慮）
+//    └─ 結果を格納する変数
+
+// ✅ 要素の有効/無効状態確認
+const isDisabled = button.attributes().disabled      // disabled属性の値を取得
+//    ↑                   ↑           ↑
+//    │                   │           └─ disabled属性名
+//    │                   └─ 要素の全属性を取得するメソッド
+//    └─ 属性値を格納する変数（undefined または "disabled"）
+
+console.log(isDisabled !== undefined)                // disabled属性があるかをboolean判定
+//          ↑               ↑
+//          │               └─ undefinedとの比較（属性なし=undefined）
+//          └─ disabled属性の存在判定
+```
+
+---
+
+## 📖 **要素の内容取得**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ テキスト内容の取得
+const title = wrapper.find('h1').text()              // h1要素のテキスト内容を取得
+//    ↑             ↑       ↑     ↑
+//    │             │       │     └─ テキスト取得メソッド
+//    │             │       └─ h1要素
+//    │             └─ 要素検索
+//    └─ テキスト内容を格納する変数
+
+console.log(title)                                   // "タイトル文字列" のような出力
+//          ↑
+//          └─ 取得したテキスト
+
+// ✅ HTML内容の取得
+const htmlContent = wrapper.find('.content').html()  // 要素のHTML内容を取得
+//    ↑                     ↑         ↑      ↑
+//    │                     │         │      └─ HTML取得メソッド
+//    │                     │         └─ content クラスの要素
+//    │                     └─ 要素検索
+//    └─ HTML内容を格納する変数
+
+console.log(htmlContent)                             // "<p>内容</p>" のような出力
+//          ↑
+//          └─ 取得したHTML
+
+// ✅ 入力要素の値取得
+const inputValue = wrapper.find('input').element.value // input要素の現在値を取得
+//    ↑                    ↑       ↑      ↑       ↑
+//    │                    │       │      │       └─ 実際のDOM要素のvalueプロパティ
+//    │                    │       │      └─ 実際のDOM要素への参照
+//    │                    │       └─ input要素
+//    │                    └─ 要素検索
+//    └─ 入力値を格納する変数
+
+console.log(inputValue)                              // "ユーザーが入力した文字列" 
+//          ↑
+//          └─ 取得した入力値
+```
+
+---
+
+## 🎮 **要素の値設定**
+
+### **基本的な値設定**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ input要素の値設定
+await wrapper.find('input[name="username"]').setValue('testuser')
+//↑   ↑       ↑    ↑                        ↑        ↑
+//│   │       │    │                        │        └─ 設定したい値
+//│   │       │    │                        └─ 値設定メソッド
+//│   │       │    └─ name属性でinput要素を特定
+//│   │       └─ 要素検索メソッド
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機（DOM更新を待つ）
+
+// ✅ select要素の値設定
+await wrapper.find('select[name="plan"]').setValue('3')
+//↑   ↑       ↑    ↑                    ↑        ↑
+//│   │       │    │                    │        └─ option のvalue値
+//│   │       │    │                    └─ 値設定メソッド
+//│   │       │    └─ name属性でselect要素を特定
+//│   │       └─ 要素検索メソッド
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+// ✅ checkbox の設定
+await wrapper.find('input[type="checkbox"]').setChecked(true)
+//↑   ↑       ↑    ↑                         ↑         ↑
+//│   │       │    │                         │         └─ チェック状態（true/false）
+//│   │       │    │                         └─ チェック設定メソッド
+//│   │       │    └─ type属性でcheckbox要素を特定
+//│   │       └─ 要素検索メソッド
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+// ✅ radio button の設定
+await wrapper.find('input[value="male"]').setChecked()
+//↑   ↑       ↑    ↑                     ↑
+//│   │       │    │                     └─ チェック設定メソッド（引数なし=選択）
+//│   │       │    └─ value属性でradio要素を特定
+//│   │       └─ 要素検索メソッド
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+```
+
+### **複雑な要素操作**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ 複数のinput要素に値を設定
+const inputs = wrapper.findAll('input')              // 全てのinput要素を取得
+//    ↑              ↑       ↑
+//    │              │       └─ input タグ
+//    │              └─ 複数要素検索メソッド
+//    └─ 要素配列を格納する変数
+
+for (let i = 0; i < inputs.length; i++) {            // 配列をループで処理
+//   ↑   ↑     ↑ ↑   ↑      ↑
+//   │   │     │ │   │      └─ 配列の長さ
+//   │   │     │ │   └─ 要素配列
+//   │   │     │ └─ ループ条件
+//   │   │     └─ インクリメント
+//   │   └─ 初期値
+//   └─ ループ変数
+
+  await inputs.at(i).setValue(`test${i}`)            // i番目の要素に値設定
+  //↑   ↑      ↑  ↑ ↑        ↑      ↑
+  //│   │      │  │ │        │      └─ インデックス番号を含む文字列
+  //│   │      │  │ │        └─ テンプレートリテラル
+  //│   │      │  │ └─ 値設定メソッド
+  //│   │      │  └─ i番目の要素取得
+  //│   │      └─ 要素配列
+  //│   └─ 非同期処理の待機
+  //└─ 非同期処理の待機
+}
+```
+
+---
+
+## 🎯 **イベントの発火**
+
+### **基本的なイベント**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ クリックイベント
+await wrapper.find('.submit-button').trigger('click')
+//↑   ↑       ↑    ↑               ↑       ↑
+//│   │       │    │               │       └─ イベント名
+//│   │       │    │               └─ イベント発火メソッド
+//│   │       │    └─ ボタン要素
+//│   │       └─ 要素検索
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機（イベント処理を待つ）
+
+// ✅ フォームサブミット
+await wrapper.find('form').trigger('submit')
+//↑   ↑       ↑    ↑     ↑       ↑
+//│   │       │    │     │       └─ submitイベント名
+//│   │       │    │     └─ イベント発火メソッド
+//│   │       │    └─ form要素
+//│   │       └─ 要素検索
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+// ✅ キーボードイベント
+await wrapper.find('input').trigger('keyup', { key: 'Enter' })
+//↑   ↑       ↑    ↑      ↑       ↑       ↑ ↑     ↑
+//│   │       │    │      │       │       │ │     └─ Enterキー
+//│   │       │    │      │       │       │ └─ key プロパティ
+//│   │       │    │      │       │       └─ イベントオプション
+//│   │       │    │      │       └─ keyupイベント名
+//│   │       │    │      └─ イベント発火メソッド
+//│   │       │    └─ input要素
+//│   │       └─ 要素検索
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+// ✅ マウスイベント
+await wrapper.find('.hover-area').trigger('mouseover')
+//↑   ↑       ↑    ↑            ↑       ↑
+//│   │       │    │            │       └─ mouseoverイベント名
+//│   │       │    │            └─ イベント発火メソッド
+//│   │       │    └─ ホバーエリア要素
+//│   │       └─ 要素検索
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+```
+
+### **複雑なイベント**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ イベントオプション付き
+await wrapper.find('input').trigger('input', {
+//↑   ↑       ↑    ↑      ↑       ↑       ↑
+//│   │       │    │      │       │       └─ イベントオプションオブジェクト開始
+//│   │       │    │      │       └─ inputイベント名
+//│   │       │    │      └─ イベント発火メソッド
+//│   │       │    └─ input要素
+//│   │       └─ 要素検索
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+  target: { value: 'new value' }                     // イベントターゲットオブジェクト
+  //↑     ↑ ↑     ↑
+  //│     │ │     └─ 新しい値
+  //│     │ └─ valueプロパティ
+  //│     └─ targetオブジェクト
+  //└─ イベントのtargetプロパティ
+})
+
+// ✅ カスタムイベント
+await wrapper.find('.custom-component').trigger('custom-event', {
+//↑   ↑       ↑    ↑                 ↑       ↑              ↑
+//│   │       │    │                 │       │              └─ イベントデータ
+//│   │       │    │                 │       └─ カスタムイベント名
+//│   │       │    │                 └─ イベント発火メソッド
+//│   │       │    └─ カスタムコンポーネント要素
+//│   │       └─ 要素検索
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+  detail: { message: 'test data' }                   // カスタムイベントのデータ
+  //↑     ↑ ↑       ↑
+  //│     │ │       └─ 送信するデータ
+  //│     │ └─ messageプロパティ
+  //│     └─ detailオブジェクト
+  //└─ カスタムイベントのデータ部分
+})
+```
+
+---
+
+## ⏰ **非同期処理の待機**
+
+### **DOM更新の待機**
+
+```javascript
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ 基本的なDOM更新待機
+await wrapper.find('button').trigger('click')        // ボタンクリック
+//↑   
+//└─ 非同期処理の待機
+
+await wrapper.vm.$nextTick()                         // Vue の次のDOM更新サイクルまで待機
+//↑   ↑        ↑  ↑
+//│   │        │  └─ 次のDOM更新まで待機するメソッド
+//│   │        └─ Vueインスタンス
+//│   └─ ラッパーオブジェクト
+//└─ 非同期処理の待機
+
+// ✅ データ変更後の確認
+wrapper.vm.message = 'New Message'                   // データを直接変更
+//      ↑  ↑         ↑
+//      │  │         └─ 新しい値
+//      │  └─ dataプロパティ
+//      └─ Vueインスタンス
+
+await wrapper.vm.$nextTick()                         // DOM更新を待機
+//↑
+//└─ DOM反映まで待機
+
+expect(wrapper.find('.message').text()).toBe('New Message')
+//     ↑       ↑    ↑         ↑      ↑   ↑
+//     │       │    │         │      │   └─ 期待値
+//     │       │    │         │      └─ 比較メソッド
+//     │       │    │         └─ テキスト取得メソッド
+//     │       │    └─ message クラスの要素
+//     │       └─ 要素検索
+//     └─ Jest のアサーション関数
+```
+
+### **Promise の待機**
+
+```javascript
+import flushPromises from 'flush-promises'           // Promise待機ライブラリ
+//     ↑            ↑    ↑
+//     │            │    └─ ライブラリパス
+//     │            └─ from キーワード
+//     └─ デフォルトインポート
+
+const wrapper = mount(Component)                      // コンポーネントをマウント
+
+// ✅ API呼び出しなどの非同期処理待機
+await wrapper.find('.fetch-button').trigger('click') // API呼び出しボタンクリック
+//↑
+//└─ 非同期処理の待機
+
+await flushPromises()                                // 全てのPromiseが完了するまで待機
+//↑   ↑
+//│   └─ 全Promise完了待機関数
+//└─ 非同期処理の待機
+
+expect(wrapper.vm.data).toEqual(expectedData)       // API取得データの確認
+//     ↑        ↑  ↑     ↑       ↑
+//     │        │  │     │       └─ 期待するデータ
+//     │        │  │     └─ 深い等価比較メソッド
+//     │        │  └─ dataプロパティ
+//     │        └─ Vueインスタンス
+//     └─ Jest のアサーション関数
+```
+
+---
+
+## 🎨 **実用的なDOMテストパターン**
+
+### **フォーム入力テスト**
+
+```javascript
+describe('ユーザー登録フォーム', () => {              // テストグループ
+//↑       ↑                     ↑
+//│       │                     └─ テストグループの処理
+//│       └─ テストの説明
+//└─ Jest のテストスイート
+
+  let wrapper                                         // ラッパー変数の宣言
+  //↑ ↑
+  //│ └─ 変数名
+  //└─ ブロックスコープ変数宣言
+
+  beforeEach(() => {                                  // 各テスト前に実行
+  //↑         ↑
+  //│         └─ 実行する関数
+  //└─ Jest のライフサイクルフック
+
+    wrapper = mount(UserRegistrationForm, {           // フォームコンポーネントをマウント
+    //↑       ↑     ↑                   ↑
+    //│       │     │                   └─ マウントオプション
+    //│       │     └─ コンポーネント名
+    //│       └─ マウント関数
+    //└─ ラッパー変数に代入
+
+      propsData: {                                    // プロパティデータ
+      //↑        ↑
+      //│        └─ オブジェクト開始
+      //└─ プロパティ渡しオプション
+
+        initialData: { name: '', email: '' }         // 初期フォームデータ
+        //↑          ↑ ↑     ↑   ↑      ↑
+        //│          │ │     │   │      └─ 空の文字列（初期値）
+        //│          │ │     │   └─ emailフィールド
+        //│          │ │     └─ 空の文字列（初期値）
+        //│          │ └─ nameフィールド
+        //│          └─ オブジェクトリテラル
+        //└─ プロパティ名
+      }
+    })
+  })
+
+  afterEach(() => {                                   // 各テスト後に実行
+  //↑        ↑
+  //│        └─ 実行する関数
+  //└─ Jest のライフサイクルフック
+
+    wrapper.destroy()                                 // メモリクリーンアップ
+    //      ↑
+    //      └─ ラッパー破棄メソッド
+  })
+
+  it('フォーム入力が正しく動作する', async () => {    // 個別テストケース
+  //↑ ↑                           ↑      ↑
+  //│ │                           │      └─ 非同期テスト関数
+  //│ │                           └─ async キーワード
+  //│ └─ テストの説明
+  //└─ Jest の個別テスト
+
+    // 名前フィールドに入力
+    await wrapper.find('input[name="name"]').setValue('田中太郎')
+    //↑   ↑       ↑    ↑                  ↑        ↑
+    //│   │       │    │                  │        └─ 入力値
+    //│   │       │    │                  └─ 値設定メソッド
+    //│   │       │    └─ name属性でinput要素を特定
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+
+    // メールフィールドに入力
+    await wrapper.find('input[name="email"]').setValue('tanaka@example.com')
+    //↑   ↑       ↑    ↑                   ↑        ↑
+    //│   │       │    │                   │        └─ メールアドレス
+    //│   │       │    │                   └─ 値設定メソッド
+    //│   │       │    └─ name属性でemail入力欄を特定
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+
+    // DOM更新を待機
+    await wrapper.vm.$nextTick()                      // Vue の DOM更新完了まで待機
+    //↑   ↑        ↑  ↑
+    //│   │        │  └─ 次のDOM更新まで待機するメソッド
+    //│   │        └─ Vueインスタンス
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+
+    // 入力値が正しく反映されているか確認
+    expect(wrapper.vm.formData.name).toBe('田中太郎')
+    //↑    ↑        ↑  ↑        ↑     ↑   ↑
+    //│    │        │  │        │     │   └─ 期待値
+    //│    │        │  │        │     └─ 厳密等価比較メソッド
+    //│    │        │  │        └─ nameプロパティ
+    //│    │        │  └─ フォームデータオブジェクト
+    //│    │        └─ Vueインスタンス
+    //│    └─ ラッパーオブジェクト
+    //└─ Jest のアサーション関数
+
+    expect(wrapper.vm.formData.email).toBe('tanaka@example.com')
+    //↑    ↑        ↑  ↑        ↑      ↑   ↑
+    //│    │        │  │        │      │   └─ 期待値
+    //│    │        │  │        │      └─ 厳密等価比較メソッド
+    //│    │        │  │        └─ emailプロパティ
+    //│    │        │  └─ フォームデータオブジェクト
+    //│    │        └─ Vueインスタンス
+    //│    └─ ラッパーオブジェクト
+    //└─ Jest のアサーション関数
+  })
+})
+```
+
+### **動的要素テスト**
+
+```javascript
+describe('商品リスト', () => {                        // テストグループ
+  it('商品が正しく表示される', async () => {           // 個別テスト
+
+    const products = [                                // テスト用商品データ
+    //    ↑         ↑
+    //    │         └─ 配列リテラル開始
+    //    └─ 商品配列を格納する変数
+
+      { id: 1, name: '商品A', price: 1000 },         // 商品オブジェクト1
+      //↑ ↑    ↑     ↑      ↑     ↑
+      //│ │    │     │      │     └─ 価格
+      //│ │    │     │      └─ priceプロパティ
+      //│ │    │     └─ 商品名
+      //│ │    └─ nameプロパティ
+      //│ └─ ID番号
+      //└─ idプロパティ
+
+      { id: 2, name: '商品B', price: 2000 },         // 商品オブジェクト2
+      { id: 3, name: '商品C', price: 3000 }          // 商品オブジェクト3
+    ]
+
+    const wrapper = mount(ProductList, {              // 商品リストコンポーネントをマウント
+    //    ↑          ↑     ↑           ↑
+    //    │          │     │           └─ マウントオプション
+    //    │          │     └─ コンポーネント名
+    //    │          └─ マウント関数
+    //    └─ ラッパー変数
+
+      propsData: { products }                         // 商品データをプロパティとして渡す
+      //↑        ↑ ↑
+      //│        │ └─ 上で作成した商品配列（オブジェクトショートハンド）
+      //│        └─ オブジェクトリテラル
+      //└─ プロパティ渡しオプション
+    })
+
+    await wrapper.vm.$nextTick()                      // DOM更新を待機
+    //↑   ↑        ↑  ↑
+    //│   │        │  └─ DOM更新待機メソッド
+    //│   │        └─ Vueインスタンス
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+
+    // 商品アイテムの数を確認
+    const productItems = wrapper.findAll('.product-item')
+    //    ↑                    ↑       ↑
+    //    │                    │       └─ 商品アイテムのCSSクラス
+    //    │                    └─ 複数要素検索メソッド
+    //    └─ 商品要素配列を格納する変数
+
+    expect(productItems).toHaveLength(3)              // 3個の商品が表示されているか確認
+    //↑    ↑             ↑           ↑
+    //│    │             │           └─ 期待する要素数
+    //│    │             └─ 配列長さ確認マッチャー
+    //│    └─ 商品要素配列
+    //└─ Jest のアサーション関数
+
+    // 各商品の内容を確認
+    for (let i = 0; i < products.length; i++) {      // 商品配列をループ
+    //   ↑   ↑     ↑ ↑   ↑        ↑
+    //   │   │     │ │   │        └─ 配列の長さ
+    //   │   │     │ │   └─ 商品配列
+    //   │   │     │ └─ ループ条件
+    //   │   │     └─ インクリメント
+    //   │   └─ 初期値
+    //   └─ ループ変数
+
+      const item = productItems.at(i)                 // i番目の商品要素を取得
+      //    ↑           ↑         ↑  ↑
+      //    │           │         │  └─ インデックス番号
+      //    │           │         └─ 指定位置要素取得メソッド
+      //    │           └─ 商品要素配列
+      //    └─ 個別商品要素を格納する変数
+
+      const product = products[i]                     // i番目の商品データを取得
+      //    ↑         ↑        ↑
+      //    │         │        └─ 配列のインデックスアクセス
+      //    │         └─ 商品配列
+      //    └─ 個別商品データを格納する変数
+
+      expect(item.find('.product-name').text()).toBe(product.name)
+      //↑    ↑    ↑    ↑              ↑      ↑   ↑       ↑
+      //│    │    │    │              │      │   │       └─ 商品データの名前
+      //│    │    │    │              │      │   └─ 期待値
+      //│    │    │    │              │      └─ 厳密等価比較
+      //│    │    │    │              └─ テキスト取得メソッド
+      //│    │    │    └─ 商品名要素のCSSクラス
+      //│    │    └─ 要素検索メソッド
+      //│    └─ 個別商品要素
+      //└─ Jest のアサーション関数
+
+      expect(item.find('.product-price').text()).toBe(`¥${product.price}`)
+      //↑    ↑    ↑    ↑               ↑      ↑   ↑   ↑       ↑
+      //│    │    │    │               │      │   │   │       └─ 商品データの価格
+      //│    │    │    │               │      │   │   └─ テンプレートリテラル
+      //│    │    │    │               │      │   └─ 期待値（¥マーク付き）
+      //│    │    │    │               │      └─ 厳密等価比較
+      //│    │    │    │               └─ テキスト取得メソッド
+      //│    │    │    └─ 商品価格要素のCSSクラス
+      //│    │    └─ 要素検索メソッド
+      //│    └─ 個別商品要素
+      //└─ Jest のアサーション関数
+    }
+  })
+})
+```
+
+このように一行ずつコメントを書くことで、Vue.jsのDOM操作とマウントの仕組みが完全に理解できるはずです！実際にコードを書きながら確認してみてください。
+
+ーーーーーーーーーーーーーー
+
+# 🎯 **Vue.js @click 完全マスターガイド（新人エンジニア特化）**
+
+## 🚀 **@clickとは？（3秒で理解）**
+
+```html
+<!-- ❌ 普通のHTML（Vue.js無し） -->
+<button onclick="handleClick()">クリック</button>
+
+<!-- ✅ Vue.js の @click -->
+<button @click="handleClick">クリック</button>
+```
+
+**@click = Vue.jsでクリックイベントを簡単に扱う魔法の記法**
+
+---
+
+## 📐 **@click の基本文法図解**
+
+```html
+<button @click="functionName">ボタン</button>
+        ↑       ↑
+        │       └─ 実行したい関数名
+        └─ Vue.js のイベントディレクティブ
+```
+
+### **文法構造の詳細分解**
+
+```
+@click = v-on:click の省略記法
+
+┌─────────────────────────────────┐
+│        完全な書き方              │
+│  <button v-on:click="func">     │
+│           ↓ 省略               │
+│  <button @click="func">         │
+└─────────────────────────────────┘
+```
+
+---
+
+## 🔧 **Step 1: 基本的な@click（一行ずつ解説）**
+
+### **最もシンプルなパターン**
+
+```html
+<template>
+  <!-- テンプレート部分（HTML構造） -->
+  <div>
+  <!-- ↑ ↑
+       │ └─ 閉じタグ
+       └─ 開始タグ（divコンテナ） -->
+    
+    <h1>{{ message }}</h1>
+    <!-- ↑  ↑ ↑       ↑ ↑
+         │  │ │       │ └─ マスタッシュ構文の終了
+         │  │ │       └─ データプロパティ名
+         │  │ └─ マスタッシュ構文の開始（データバインディング）
+         │  └─ h1タグの開始
+         └─ h1タグ（見出し要素） -->
+    
+    <button @click="changeMessage">メッセージ変更</button>
+    <!--    ↑      ↑             ↑
+            │      │             └─ ボタンに表示される文字
+            │      └─ 実行する関数名（引数なし）
+            └─ クリックイベントディレクティブ -->
+  </div>
+</template>
+
+<script>
+export default {
+//↑    ↑
+//│    └─ デフォルトエクスポート（ES6）
+//└─ モジュールエクスポート構文
+
+  data() {
+  //↑   ↑
+  //│   └─ 関数の開始
+  //└─ Vue.js のデータプロパティ定義メソッド
+  
+    return {
+    //↑    ↑
+    //│    └─ オブジェクトリテラルの開始
+    //└─ 戻り値（リアクティブなデータオブジェクト）
+    
+      message: 'こんにちは！'
+      //↑      ↑
+      //│      └─ 初期値（文字列）
+      //└─ データプロパティ名
+    }
+  },
+  
+  methods: {
+  //↑      ↑
+  //│      └─ オブジェクトリテラルの開始
+  //└─ Vue.js のメソッド定義プロパティ
+  
+    changeMessage() {
+    //↑           ↑
+    //│           └─ メソッドの開始
+    //└─ メソッド名（テンプレートで呼び出される）
+    
+      this.message = 'メッセージが変わりました！'
+      //↑  ↑         ↑
+      //│  │         └─ 新しい値
+      //│  └─ データプロパティへの参照
+      //└─ Vue インスタンス（現在のコンポーネント）
+    }
+  }
+}
+</script>
+```
+
+### **実行フロー図解**
+
+```
+【初期状態】
+┌─────────────────────────────────┐
+│     画面表示                    │
+│  ┌─────────────────────────────┐ │
+│  │  こんにちは！               │ │
+│  │  [メッセージ変更]           │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
+
+        ユーザーがボタンクリック
+                ↓
+
+【@click="changeMessage" が発火】
+┌─────────────────────────────────┐
+│   Vue.js 内部処理               │
+│  1. クリックイベントを検知        │
+│  2. changeMessage メソッドを実行  │
+│  3. this.message を更新         │
+│  4. 画面を自動で再レンダリング    │
+└─────────────────────────────────┘
+
+                ↓
+
+【更新後の状態】
+┌─────────────────────────────────┐
+│     画面表示                    │
+│  ┌─────────────────────────────┐ │
+│  │  メッセージが変わりました！   │ │
+│  │  [メッセージ変更]           │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
+```
+
+---
+
+## 🎯 **Step 2: 関数に引数を渡す（詳細解説）**
+
+### **引数付き関数呼び出し**
+
+```html
+<template>
+  <div>
+    <p>現在のカウント: {{ count }}</p>
+    <!--                ↑ ↑     ↑
+                        │ │     └─ データプロパティ
+                        │ └─ マスタッシュ構文
+                        └─ 動的に表示される値 -->
+    
+    <!-- 引数なしパターン -->
+    <button @click="increment">+1</button>
+    <!--    ↑      ↑         ↑
+            │      │         └─ ボタンテキスト
+            │      └─ 関数名（引数なし、()も不要）
+            └─ クリックイベント -->
+    
+    <!-- 引数ありパターン -->
+    <button @click="addNumber(5)">+5</button>
+    <!--    ↑      ↑        ↑ ↑  ↑
+            │      │        │ │  └─ ボタンテキスト
+            │      │        │ └─ 関数呼び出しの終了
+            │      │        └─ 引数（数値の5）
+            │      └─ 関数名（引数付きは()必須）
+            └─ クリックイベント -->
+    
+    <button @click="addNumber(10)">+10</button>
+    <!--    ↑      ↑        ↑  ↑
+            │      │        │  └─ 引数（数値の10）
+            │      │        └─ 関数名
+            │      └─ 同じ関数、異なる引数
+            └─ クリックイベント -->
+    
+    <!-- 文字列引数パターン -->
+    <button @click="showMessage('こんにちは')">挨拶</button>
+    <!--    ↑      ↑           ↑        ↑    ↑
+            │      │           │        │    └─ ボタンテキスト
+            │      │           │        └─ 文字列引数（シングルクォート）
+            │      │           └─ 引数
+            │      └─ 関数名
+            └─ クリックイベント -->
+            
+    <!-- 変数を引数として渡すパターン -->
+    <button @click="multiplyNumber(multiplier)">×{{ multiplier }}</button>
+    <!--    ↑      ↑             ↑          ↑  ↑ ↑          ↑
+            │      │             │          │  │ │          └─ 動的なボタンテキスト
+            │      │             │          │  │ └─ データプロパティ
+            │      │             │          │  └─ マスタッシュ構文
+            │      │             │          └─ ボタンテキスト
+            │      │             └─ データプロパティを引数として渡す
+            │      └─ 関数名
+            └─ クリックイベント -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      count: 0,
+      //↑     ↑
+      //│     └─ 初期値（ゼロ）
+      //└─ カウンター用データプロパティ
+      
+      multiplier: 2
+      //↑         ↑
+      //│         └─ 初期値（2倍）
+      //└─ 乗数用データプロパティ
+    }
+  },
+  
+  methods: {
+    increment() {
+    //↑       ↑
+    //│       └─ 引数なしメソッド
+    //└─ メソッド名
+    
+      this.count++
+      //↑  ↑     ↑
+      //│  │     └─ インクリメント演算子（+1）
+      //│  └─ countプロパティ
+      //└─ このコンポーネントのインスタンス
+    },
+    
+    addNumber(num) {
+    //↑       ↑   ↑
+    //│       │   └─ 引数の終了
+    //│       └─ 引数名（テンプレートから渡される値）
+    //└─ メソッド名
+    
+      this.count += num
+      //↑  ↑      ↑  ↑
+      //│  │      │  └─ 引数で受け取った値
+      //│  │      └─ 加算代入演算子
+      //│  └─ countプロパティ
+      //└─ このコンポーネントのインスタンス
+    },
+    
+    showMessage(text) {
+    //↑         ↑    ↑
+    //│         │    └─ 引数の終了
+    //│         └─ 引数名（文字列を受け取る）
+    //└─ メソッド名
+    
+      alert(text)
+      //↑   ↑
+      //│   └─ 引数で受け取った文字列
+      //└─ ブラウザのアラート表示関数
+    },
+    
+    multiplyNumber(multiplier) {
+    //↑            ↑         ↑
+    //│            │         └─ 引数の終了
+    //│            └─ 引数名（乗数）
+    //└─ メソッド名
+    
+      this.count *= multiplier
+      //↑  ↑      ↑  ↑
+      //│  │      │  └─ 引数で受け取った乗数
+      //│  │      └─ 乗算代入演算子
+      //│  └─ countプロパティ
+      //└─ このコンポーネントのインスタンス
+    }
+  }
+}
+</script>
+```
+
+### **引数渡しの動作図解**
+
+```
+【ボタンクリック時の引数の流れ】
+
+<button @click="addNumber(5)">+5</button>
+                      ↓
+              addNumber メソッド呼び出し
+                      ↓
+┌─────────────────────────────────┐
+│   addNumber(num) {              │
+│     ↑        ↑                │
+│     │        └─ num = 5 が渡される │
+│     └─ メソッド名               │
+│                                │
+│     this.count += num          │
+│                   ↑            │
+│                   └─ 5が加算される │
+└─────────────────────────────────┘
+                      ↓
+                countが更新される
+                      ↓
+                画面が自動更新
+```
+
+---
+
+## 🎯 **Step 3: イベントオブジェクトの扱い（高度な内容）**
+
+### **$event の使い方**
+
+```html
+<template>
+  <div>
+    <!-- イベントオブジェクトを取得するパターン -->
+    <button @click="handleClickEvent($event)">イベント情報取得</button>
+    <!--    ↑      ↑                 ↑       ↑
+            │      │                 │       └─ ボタンテキスト
+            │      │                 └─ 特別な変数（クリックイベントオブジェクト）
+            │      └─ メソッド名
+            └─ クリックイベント -->
+    
+    <!-- 引数と$eventの両方を渡すパターン -->
+    <button @click="handleMixed('ボタン1', $event)">混合パターン</button>
+    <!--    ↑      ↑           ↑         ↑       ↑
+            │      │           │         │       └─ イベントオブジェクト
+            │      │           │         └─ カンマ区切り
+            │      │           └─ 文字列引数
+            │      └─ メソッド名
+            └─ クリックイベント -->
+    
+    <!-- マウス座標を取得するパターン -->
+    <div @click="getMousePosition($event)" class="click-area">
+    <!--  ↑      ↑                 ↑       ↑
+          │      │                 │       └─ CSSクラス
+          │      │                 └─ イベントオブジェクト
+          │      └─ マウス座標取得メソッド
+          └─ divにもクリックイベントを設定可能 -->
+      クリックして座標を取得
+    </div>
+    
+    <p>最後のクリック座標: X={{ lastClickX }}, Y={{ lastClickY }}</p>
+    <!--                    ↑ ↑            ↑  ↑ ↑            ↑
+                            │ │            │  │ │            └─ Y座標データ
+                            │ │            │  │ └─ マスタッシュ構文
+                            │ │            │  └─ カンマとスペース
+                            │ │            └─ X座標データ
+                            │ └─ マスタッシュ構文
+                            └─ 固定テキスト -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      lastClickX: 0,
+      //↑         ↑
+      //│         └─ 初期値
+      //└─ X座標を保存するデータプロパティ
+      
+      lastClickY: 0
+      //↑         ↑
+      //│         └─ 初期値
+      //└─ Y座標を保存するデータプロパティ
+    }
+  },
+  
+  methods: {
+    handleClickEvent(event) {
+    //↑              ↑     ↑
+    //│              │     └─ 引数の終了
+    //│              └─ イベントオブジェクトを受け取る引数
+    //└─ メソッド名
+    
+      console.log('クリックされました！')
+      //↑       ↑   ↑
+      //│       │   └─ 出力する文字列
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      console.log('イベントタイプ:', event.type)
+      //↑       ↑   ↑             ↑     ↑
+      //│       │   │             │     └─ イベントの種類（'click'）
+      //│       │   │             └─ イベントオブジェクトのtypeプロパティ
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      console.log('クリックされた要素:', event.target)
+      //↑       ↑   ↑                 ↑     ↑
+      //│       │   │                 │     └─ クリックされたDOM要素
+      //│       │   │                 └─ イベントオブジェクトのtargetプロパティ
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    handleMixed(text, event) {
+    //↑         ↑     ↑     ↑
+    //│         │     │     └─ 引数の終了
+    //│         │     └─ イベントオブジェクト
+    //│         └─ 文字列引数
+    //└─ メソッド名
+    
+      console.log('受け取ったテキスト:', text)
+      //↑       ↑   ↑                 ↑
+      //│       │   │                 └─ テンプレートから渡された文字列
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      console.log('ボタンのテキスト:', event.target.textContent)
+      //↑       ↑   ↑               ↑     ↑      ↑
+      //│       │   │               │     │      └─ DOM要素のテキスト内容
+      //│       │   │               │     └─ クリックされたDOM要素
+      //│       │   │               └─ イベントオブジェクト
+      //│       │   └─ 出力ラベル
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    getMousePosition(event) {
+    //↑              ↑     ↑
+    //│              │     └─ 引数の終了
+    //│              └─ マウスイベントオブジェクト
+    //└─ メソッド名
+    
+      this.lastClickX = event.clientX
+      //↑  ↑           ↑     ↑
+      //│  │           │     └─ マウスのX座標（ビューポート基準）
+      //│  │           └─ イベントオブジェクト
+      //│  └─ X座標データプロパティ
+      //└─ このコンポーネントのインスタンス
+      
+      this.lastClickY = event.clientY
+      //↑  ↑           ↑     ↑
+      //│  │           │     └─ マウスのY座標（ビューポート基準）
+      //│  │           └─ イベントオブジェクト
+      //│  └─ Y座標データプロパティ
+      //└─ このコンポーネントのインスタンス
+      
+      console.log(`クリック座標: (${this.lastClickX}, ${this.lastClickY})`)
+      //↑       ↑   ↑               ↑                ↑                  ↑
+      //│       │   │               │                │                  └─ テンプレートリテラルの終了
+      //│       │   │               │                └─ Y座標の埋め込み
+      //│       │   │               └─ X座標の埋め込み
+      //│       │   └─ テンプレートリテラル（バッククォート）
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    }
+  }
+}
+</script>
+
+<style>
+.click-area {
+  /*↑
+    └─ CSSクラス名 */
+  
+  width: 300px;
+  /*↑    ↑
+    │    └─ 幅の値
+    └─ 幅プロパティ */
+    
+  height: 200px;
+  /*↑     ↑
+    │     └─ 高さの値
+    └─ 高さプロパティ */
+    
+  border: 2px solid #ccc;
+  /*↑     ↑   ↑     ↑
+    │     │   │     └─ 色（グレー）
+    │     │   └─ 線のスタイル
+    │     └─ 線の太さ
+    └─ 境界線プロパティ */
+    
+  background-color: #f0f0f0;
+  /*↑               ↑
+    │               └─ 背景色（薄いグレー）
+    └─ 背景色プロパティ */
+    
+  cursor: pointer;
+  /*↑     ↑
+    │     └─ ポインター形状
+    └─ カーソルプロパティ */
+}
+</style>
+```
+
+### **イベントオブジェクトの内容図解**
+
+```
+【$event（マウスクリックイベント）の中身】
+
+event = {
+  type: 'click',           ← イベントの種類
+  target: <button>,        ← クリックされた要素
+  clientX: 150,           ← マウスのX座標
+  clientY: 75,            ← マウスのY座標
+  timeStamp: 1234567890,  ← イベント発生時刻
+  preventDefault: f(),    ← デフォルト動作を止める関数
+  stopPropagation: f()    ← イベント伝播を止める関数
+}
+
+【使用例】
+@click="myMethod($event)"
+           ↓
+myMethod(event) {
+  console.log(event.type)     // 'click'
+  console.log(event.clientX)  // 150
+  console.log(event.clientY)  // 75
+}
+```
+
+---
+
+## 🛡️ **Step 4: イベント修飾子（実用テクニック）**
+
+### **基本的な修飾子**
+
+```html
+<template>
+  <div>
+    <!-- .prevent修飾子（デフォルト動作を防ぐ） -->
+    <form @submit.prevent="handleSubmit">
+    <!--  ↑      ↑       ↑
+          │      │       └─ フォーム送信処理メソッド
+          │      └─ prevent修飾子（ページリロードを防ぐ）
+          └─ submitイベント -->
+      
+      <input type="text" v-model="formData" />
+      <!--   ↑     ↑     ↑       ↑
+             │     │     │       └─ バインドするデータ
+             │     │     └─ 双方向データバインディング
+             │     └─ 入力タイプ
+             └─ 入力要素 -->
+             
+      <button type="submit">送信</button>
+      <!--    ↑     ↑      ↑
+              │     │      └─ ボタンテキスト
+              │     └─ submitタイプ（フォーム送信ボタン）
+              └─ ボタン要素 -->
+    </form>
+    
+    <!-- .once修飾子（一度だけ実行） -->
+    <button @click.once="oneTimeAction">一度だけ実行</button>
+    <!--    ↑      ↑    ↑            ↑
+            │      │    │            └─ ボタンテキスト
+            │      │    └─ 一回限りのメソッド
+            │      └─ once修飾子（最初のクリックのみ実行）
+            └─ クリックイベント -->
+    
+    <!-- .stop修飾子（イベント伝播を停止） -->
+    <div @click="parentClick" class="parent">
+    <!--  ↑      ↑           ↑      ↑
+          │      │           │      └─ CSSクラス
+          │      │           └─ 親要素のクリックハンドラー
+          │      └─ 親のクリックイベント
+          └─ 親要素（div） -->
+      
+      親要素
+      <button @click.stop="childClick">子要素</button>
+      <!--    ↑      ↑    ↑          ↑
+              │      │    │          └─ ボタンテキスト
+              │      │    └─ 子要素のクリックハンドラー
+              │      └─ stop修飾子（親への伝播を停止）
+              └─ 子要素のクリックイベント -->
+    </div>
+    
+    <!-- .self修飾子（要素自身がクリックされた時のみ） -->
+    <div @click.self="selfClick" class="self-area">
+    <!--  ↑      ↑    ↑         ↑      ↑
+          │      │    │         │      └─ CSSクラス
+          │      │    │         └─ 自身クリック時のハンドラー
+          │      │    └─ self修飾子（子要素クリック時は発火しない）
+          │      └─ クリックイベント
+          └─ 親要素 -->
+      
+      この領域をクリック
+      <span>この子要素をクリックしても親のイベントは発火しない</span>
+      <!--  ↑
+            └─ 子要素（spanタグ） -->
+    </div>
+    
+    <!-- 複数修飾子の組み合わせ -->
+    <a href="https://example.com" @click.prevent.stop="linkClick">
+    <!-- ↑     ↑                  ↑      ↑       ↑    ↑
+         │     │                  │      │       │    └─ リンククリックハンドラー
+         │     │                  │      │       └─ 複数修飾子の組み合わせ
+         │     │                  │      └─ prevent（リンク遷移を防ぐ）
+         │     │                  └─ クリックイベント
+         │     └─ リンク先URL
+         └─ リンク要素 -->
+      
+      リンクテキスト
+    </a>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      formData: ''
+      //↑       ↑
+      //│       └─ 初期値（空文字）
+      //└─ フォーム入力データ
+    }
+  },
+  
+  methods: {
+    handleSubmit() {
+    //↑         ↑
+    //│         └─ メソッドの開始
+    //└─ フォーム送信処理メソッド
+    
+      console.log('フォームが送信されました:', this.formData)
+      //↑       ↑   ↑                     ↑    ↑
+      //│       │   │                     │    └─ 入力されたデータ
+      //│       │   │                     └─ このコンポーネントのインスタンス
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      // 実際の送信処理をここに書く
+      // API呼び出しなど
+    },
+    
+    oneTimeAction() {
+    //↑           ↑
+    //│           └─ メソッドの開始
+    //└─ 一度だけ実行されるメソッド
+    
+      console.log('このメソッドは一度だけ実行されます')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+      
+      alert('一度だけの処理が実行されました！')
+      //↑   ↑
+      //│   └─ アラートメッセージ
+      //└─ ブラウザのアラート表示関数
+    },
+    
+    parentClick() {
+    //↑         ↑
+    //│         └─ メソッドの開始
+    //└─ 親要素クリック時のメソッド
+    
+      console.log('親要素がクリックされました')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    childClick() {
+    //↑        ↑
+    //│        └─ メソッドの開始
+    //└─ 子要素クリック時のメソッド
+    
+      console.log('子要素がクリックされました（親には伝播しません）')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    selfClick() {
+    //↑       ↑
+    //│       └─ メソッドの開始
+    //└─ 自身クリック時のメソッド
+    
+      console.log('div自身がクリックされました')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    },
+    
+    linkClick() {
+    //↑       ↑
+    //│       └─ メソッドの開始
+    //└─ リンククリック時のメソッド
+    
+      console.log('リンクがクリックされましたが遷移しません')
+      //↑       ↑   ↑
+      //│       │   └─ 出力メッセージ
+      //│       └─ ログ出力メソッド
+      //└─ ブラウザのconsoleオブジェクト
+    }
+  }
+}
+</script>
+
+<style>
+.parent {
+  /*↑
+    └─ 親要素のCSSクラス */
+  
+  padding: 20px;
+  /*↑      ↑
+    │      └─ 内側余白の値
+    └─ 内側余白プロパティ */
+    
+  border: 1px solid blue;
+  /*↑     ↑   ↑     ↑
+    │     │   │     └─ 青色
+    │     │   └─ 実線
+    │     └─ 線の太さ
+    └─ 境界線プロパティ */
+    
+  background-color: lightblue;
+  /*↑               ↑
+    │               └─ 薄い青色
+    └─ 背景色プロパティ */
+}
+
+.self-area {
+  /*↑
+    └─ 自身クリック領域のCSSクラス */
+  
+  padding: 20px;
+  /*↑      ↑
+    │      └─ 内側余白の値
+    └─ 内側余白プロパティ */
+    
+  border: 1px solid green;
+  /*↑     ↑   ↑     ↑
+    │     │   │     └─ 緑色
+    │     │   └─ 実線
+    │     └─ 線の太さ
+    └─ 境界線プロパティ */
+    
+  background-color: lightgreen;
+  /*↑               ↑
+    │               └─ 薄い緑色
+    └─ 背景色プロパティ */
+}
+</style>
+```
+
+### **修飾子の動作比較図解**
+
+```
+【.prevent修飾子】
+通常のform submit:
+フォーム送信 → ページリロード（望ましくない）
+
+.prevent付き:
+フォーム送信 → リロードなし → Vue.jsメソッド実行
+
+【.stop修飾子】
+通常のイベント伝播:
+子要素クリック → 親要素のイベントも発火
+
+.stop付き:
+子要素クリック → 親要素のイベントは発火しない
+
+【.once修飾子】
+通常:
+クリック → メソッド実行
+クリック → メソッド実行（毎回）
+クリック → メソッド実行
+
+.once付き:
+クリック → メソッド実行
+クリック → 何も起こらない
+クリック → 何も起こらない
+```
+
+---
+
+## 🧪 **Step 5: テストでの@click検証（実装パターン）**
+
+### **基本的なクリックテスト**
+
+```javascript
+import { mount } from '@vue/test-utils'               // Vue Test Utilsライブラリ
+//     ↑ ↑     ↑    ↑
+//     │ │     │    └─ ライブラリのパス
+//     │ │     └─ インポート元
+//     │ └─ 名前付きインポート
+//     └─ ES6インポート構文
+
+import ButtonComponent from '@/components/ButtonComponent.vue'
+//     ↑               ↑    ↑
+//     │               │    └─ コンポーネントファイルのパス
+//     │               └─ from キーワード
+//     └─ デフォルトインポート
+
+describe('ButtonComponent', () => {                   // テストスイート
+//↑       ↑                 ↑
+//│       │                 └─ テストグループの処理
+//│       └─ テストの説明
+//└─ Jest のテストグループ化関数
+
+  let wrapper                                         // ラッパー変数
+  //↑ ↑
+  //│ └─ 変数名
+  //└─ ブロックスコープ変数宣言
+  
+  beforeEach(() => {                                  // 各テスト前に実行
+  //↑         ↑
+  //│         └─ 実行する関数
+  //└─ Jest のライフサイクルフック
+  
+    wrapper = mount(ButtonComponent)                  // コンポーネントをマウント
+    //↑       ↑     ↑
+    //│       │     └─ マウント対象コンポーネント
+    //│       └─ Vue Test Utils のマウント関数
+    //└─ ラッパー変数に結果を代入
+  })
+  
+  afterEach(() => {                                   // 各テスト後に実行
+  //↑        ↑
+  //│        └─ 実行する関数
+  //└─ Jest のライフサイクルフック
+  
+    wrapper.destroy()                                 // メモリクリーンアップ
+    //      ↑
+    //      └─ コンポーネント破棄メソッド
+  })
+  
+  it('ボタンクリックでメッセージが変わる', async () => {
+  //↑ ↑                           ↑      ↑
+  //│ │                           │      └─ 非同期テスト関数
+  //│ │                           └─ async キーワード
+  //│ └─ テストケースの説明
+  //└─ Jest の個別テスト関数
+  
+    // 初期状態の確認
+    expect(wrapper.find('p').text()).toBe('初期メッセージ')
+    //↑    ↑       ↑    ↑   ↑      ↑   ↑
+    //│    │       │    │   │      │   └─ 期待値
+    //│    │       │    │   │      └─ 厳密等価比較マッチャー
+    //│    │       │    │   └─ テキスト取得メソッド
+    //│    │       │    └─ p要素
+    //│    │       └─ DOM要素検索メソッド
+    //│    └─ ラッパーオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // ボタンクリックをシミュレート
+    await wrapper.find('button').trigger('click')
+    //↑   ↑       ↑    ↑        ↑       ↑
+    //│   │       │    │        │       └─ イベント名
+    //│   │       │    │        └─ イベント発火メソッド
+    //│   │       │    └─ button要素
+    //│   │       └─ DOM要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // DOM更新を待機
+    await wrapper.vm.$nextTick()
+    //↑   ↑        ↑  ↑
+    //│   │        │  └─ 次のDOM更新まで待機するメソッド
+    //│   │        └─ Vueインスタンス
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // 変更後の状態を確認
+    expect(wrapper.find('p').text()).toBe('変更されたメッセージ')
+    //↑    ↑       ↑    ↑   ↑      ↑   ↑
+    //│    │       │    │   │      │   └─ 期待値（変更後）
+    //│    │       │    │   │      └─ 厳密等価比較マッチャー
+    //│    │       │    │   └─ テキスト取得メソッド
+    //│    │       │    └─ p要素
+    //│    │       └─ DOM要素検索メソッド
+    //│    └─ ラッパーオブジェクト
+    //└─ Jest のアサーション関数
+  })
+  
+  it('メソッドが正しく呼ばれる', async () => {        // メソッド呼び出しテスト
+    
+    // メソッドをスパイ化（監視）
+    const spy = jest.spyOn(wrapper.vm, 'changeMessage')
+    //    ↑     ↑    ↑     ↑        ↑  ↑
+    //    │     │    │     │        │  └─ 監視対象メソッド名
+    //    │     │    │     │        └─ Vueインスタンス
+    //    │     │    │     └─ ラッパーオブジェクト
+    //    │     │    └─ スパイ作成メソッド
+    //    │     └─ Jest テストフレームワーク
+    //    └─ スパイオブジェクトを格納する変数
+    
+    // ボタンクリック
+    await wrapper.find('button').trigger('click')
+    //↑   ↑       ↑    ↑        ↑       ↑
+    //│   │       │    │        │       └─ クリックイベント
+    //│   │       │    │        └─ イベント発火メソッド
+    //│   │       │    └─ ボタン要素
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // メソッドが呼ばれたことを確認
+    expect(spy).toHaveBeenCalled()
+    //↑    ↑    ↑
+    //│    │    └─ 「呼び出された」ことを確認するマッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    expect(spy).toHaveBeenCalledTimes(1)
+    //↑    ↑    ↑                    ↑
+    //│    │    │                    └─ 期待する呼び出し回数
+    //│    │    └─ 呼び出し回数確認マッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // スパイを復元
+    spy.mockRestore()
+    //  ↑
+    //  └─ スパイの監視を解除するメソッド
+  })
+})
+```
+
+### **引数付きメソッドのテスト**
+
+```javascript
+describe('引数付きクリックテスト', () => {             // テストスイート
+
+  it('引数付きメソッドが正しく呼ばれる', async () => {
+    
+    const wrapper = mount(CounterComponent)           // カウンターコンポーネント
+    //    ↑          ↑     ↑
+    //    │          │     └─ カウンター機能付きコンポーネント
+    //    │          └─ マウント関数
+    //    └─ ラッパー変数
+    
+    // addNumberメソッドをスパイ化
+    const addSpy = jest.spyOn(wrapper.vm, 'addNumber')
+    //    ↑        ↑    ↑     ↑        ↑  ↑
+    //    │        │    │     │        │  └─ 引数付きメソッド名
+    //    │        │    │     │        └─ Vueインスタンス
+    //    │        │    │     └─ ラッパーオブジェクト
+    //    │        │    └─ スパイ作成メソッド
+    //    │        └─ Jest テストフレームワーク
+    //    └─ スパイオブジェクト
+    
+    // +5ボタンをクリック
+    await wrapper.find('button[data-testid="add-5"]').trigger('click')
+    //↑   ↑       ↑    ↑      ↑                     ↑       ↑
+    //│   │       │    │      │                     │       └─ クリックイベント
+    //│   │       │    │      │                     └─ イベント発火
+    //│   │       │    │      └─ テスト用のdata属性で要素特定
+    //│   │       │    └─ button要素
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // メソッドが正しい引数で呼ばれたことを確認
+    expect(addSpy).toHaveBeenCalledWith(5)
+    //↑    ↑      ↑                     ↑
+    //│    │      │                     └─ 期待する引数値
+    //│    │      └─ 特定の引数で呼ばれたことを確認するマッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // +10ボタンをクリック
+    await wrapper.find('button[data-testid="add-10"]').trigger('click')
+    //↑   ↑       ↑    ↑      ↑                      ↑       ↑
+    //│   │       │    │      │                      │       └─ クリックイベント
+    //│   │       │    │      │                      └─ イベント発火
+    //│   │       │    │      └─ テスト用のdata属性で要素特定
+    //│   │       │    └─ button要素
+    //│   │       └─ 要素検索メソッド
+    //│   └─ ラッパーオブジェクト
+    //└─ 非同期処理の待機
+    
+    // 2回目の呼び出しの引数を確認
+    expect(addSpy).toHaveBeenNthCalledWith(2, 10)
+    //↑    ↑      ↑                        ↑  ↑
+    //│    │      │                        │  └─ 期待する引数値
+    //│    │      │                        └─ 何回目の呼び出しか
+    //│    │      └─ N回目の呼び出しで特定引数が使われたかを確認
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    // 合計2回呼ばれたことを確認
+    expect(addSpy).toHaveBeenCalledTimes(2)
+    //↑    ↑      ↑                    ↑
+    //│    │      │                    └─ 期待する呼び出し回数
+    //│    │      └─ 呼び出し回数確認マッチャー
+    //│    └─ スパイオブジェクト
+    //└─ Jest のアサーション関数
+    
+    addSpy.mockRestore()                            // スパイ復元
+    //     ↑
+    //     └─ スパイ監視解除メソッド
+  })
+})
+```
+
+---
+
+## 🎯 **Step 6: 実用的な@clickパターン集**
+
+### **条件付きクリック処理**
+
+```html
+<template>
+  <div>
+    <!-- 状態に応じてボタンの動作を変える -->
+    <button 
+      @click="toggleState" 
+      :disabled="isLoading"
+      :class="{ active: isActive }"
+    >
+    <!--↑      ↑           ↑        ↑               ↑
+        │      │           │        │               └─ 条件付きCSSクラス
+        │      │           │        └─ クラスバインディング
+        │      │           └─ ローディング中は無効化
+        │      └─ 状態切り替えメソッド
+        └─ ボタン要素 -->
+      
+      {{ buttonText }}
+      <!--↑           ↑
+          │           └─ 動的なボタンテキスト
+          └─ マスタッシュ構文 -->
+    </button>
+    
+    <!-- 配列の要素をクリックで操作 -->
+    <ul>
+      <li v-for="(item, index) in items" :key="item.id">
+      <!--↑  ↑     ↑      ↑       ↑     ↑    ↑       ↑
+          │  │     │      │       │     │    │       └─ 一意のキー
+          │  │     │      │       │     │    └─ item のid プロパティ
+          │  │     │      │       │     └─ key 属性
+          │  │     │      │       └─ 配列名
+          │  │     │      └─ インデックス（省略可）
+          │  │     └─ 各要素
+          │  └─ ループ構文
+          └─ リスト要素 -->
+        
+        {{ item.name }}
+        <!--↑     ↑
+            │     └─ アイテムの名前プロパティ
+            └─ マスタッシュ構文 -->
+            
+        <button @click="removeItem(index)">削除</button>
+        <!--    ↑      ↑          ↑      ↑
+                │      │          │      └─ ボタンテキスト
+                │      │          └─ インデックスを引数として渡す
+                │      └─ アイテム削除メソッド
+                └─ クリックイベント -->
+                
+        <button @click="editItem(item)">編集</button>
+        <!--    ↑      ↑        ↑     ↑
+                │      │        │     └─ ボタンテキスト
+                │      │        └─ アイテムオブジェクト全体を引数
+                │      └─ アイテム編集メソッド
+                └─ クリックイベント -->
+      </li>
+    </ul>
+    
+    <!-- 確認ダイアログ付きクリック -->
+    <button @click="deleteWithConfirm">危険な削除</button>
+    <!--    ↑      ↑                 ↑
+            │      │                 └─ ボタンテキスト
+            │      └─ 確認付き削除メソッド
+            └─ クリックイベント -->
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      isActive: false,
+      //↑       ↑
+      //│       └─ 初期状態（非アクティブ）
+      //└─ アクティブ状態管理
+      
+      isLoading: false,
+      //↑        ↑
+      //│        └─ 初期状態（非ローディング）
+      //└─ ローディング状態管理
+      
+      items: [
+      //↑    ↑
+      //│    └─ 配列リテラル開始
+      //└─ アイテム配列
+      
+        { id: 1, name: 'アイテム1' },
+        //↑ ↑    ↑     ↑
+        //│ │    │     └─ アイテム名
+        //│ │    └─ name プロパティ
+        //│ └─ 一意のID
+        //└─ id プロパティ
+        
+        { id: 2, name: 'アイテム2' },
+        { id: 3, name: 'アイテム3' }
+      ]
+    }
+  },
+  
+  computed: {
+    buttonText() {
+    //↑        ↑
+    //│        └─ 算出プロパティ（リアクティブ）
+    //└─ ボタンテキストを動的に決定
+    
+      if (this.isLoading) {
+      //↑ ↑    ↑
+      //│ │    └─ ローディング状態
+      //│ └─ このコンポーネントのインスタンス
+      //└─ 条件分岐
+      
+        return 'ローディング中...'
+        //↑    ↑
+        //│    └─ ローディング中のテキスト
+        //└─ 戻り値
+      }
+      
+      return this.isActive ? 'アクティブ' : '非アクティブ'
+      //↑    ↑    ↑         ↑ ↑          ↑ ↑
+      //│    │    │         │ │          │ └─ false時の値
+      //│    │    │         │ │          └─ 条件演算子の区切り
+      //│    │    │         │ └─ true時の値
+      //│    │    │         └─ 条件演算子の区切り
+      //│    │    └─ アクティブ状態
+      //│    └─ このコンポーネントのインスタンス
+      //└─ 戻り値
+    }
+  },
+  
+  methods: {
+    toggleState() {
+    //↑         ↑
+    //│         └─ メソッドの開始
+    //└─ 状態切り替えメソッド
+    
+      this.isLoading = true
+      //↑  ↑          ↑
+      //│  │          └─ ローディング開始
+      //│  └─ ローディング状態
+      //└─ このコンポーネントのインスタンス
+      
+      // 非同期処理をシミュレート
+      setTimeout(() => {
+      //↑        ↑
+      //│        └─ 遅延実行する関数
+      //└─ ブラウザのタイマー関数
+      
+        this.isActive = !this.isActive
+        //↑  ↑         ↑ ↑    ↑
+        //│  │         │ │    └─ 現在のアクティブ状態
+        //│  │         │ └─ このコンポーネントのインスタンス
+        //│  │         └─ 論理否定演算子（反転）
+        //│  └─ アクティブ状態
+        //└─ このコンポーネントのインスタンス
+        
+        this.isLoading = false
+        //↑  ↑          ↑
+        //│  │          └─ ローディング終了
+        //│  └─ ローディング状態
+        //└─ このコンポーネントのインスタンス
+        
+      }, 1000)
+      //  ↑
+      //  └─ 遅延時間（1000ミリ秒 = 1秒）
+    },
+    
+    removeItem(index) {
+    //↑        ↑     ↑
+    //│        │     └─ 引数の終了
+    //│        └─ 削除対象のインデックス番号
+    //└─ アイテム削除メソッド
+    
+      this.items.splice(index, 1)
+      //↑  ↑     ↑      ↑     ↑
+      //│  │     │      │     └─ 削除する要素数
+      //│  │     │      └─ 削除開始位置
+      //│  │     └─ 配列の要素削除メソッド
+      //│  └─ アイテム配列
+      //└─ このコンポーネントのインスタンス
+    },
+    
+    editItem(item) {
+    //↑      ↑    ↑
+    //│      │    └─ 引数の終了
+    //│      └─ 編集対象のアイテムオブジェクト
+    //└─ アイテム編集メソッド
+    
+      const newName = prompt('新しい名前を入力:', item.name)
+      //    ↑         ↑      ↑                  ↑    ↑
+      //    │         │      │                  │    └─ アイテムの現在名
+      //    │         │      │                  └─ アイテムオブジェクト
+      //    │         │      └─ 初期値として現在の名前を設定
+      //    │         └─ ブラウザの入力ダイアログ
+      //    └─ 入力された新しい名前を格納
+      
+      if (newName && newName.trim()) {
+      //↑ ↑       ↑  ↑       ↑
+      //│ │       │  │       └─ 空白文字を除去するメソッド
+      //│ │       │  └─ 新しい名前
+      //│ │       └─ 論理積演算子
+      //│ └─ 入力された値が存在するか
+      //└─ 条件分岐
+      
+        item.name = newName.trim()
+        //↑  ↑     ↑       ↑
+        //│  │     │       └─ 前後の空白を除去
+        //│  │     └─ 入力された新しい名前
+        //│  └─ アイテムのnameプロパティ
+        //└─ 編集対象のアイテム
+      }
+    },
+    
+    deleteWithConfirm() {
+    //↑               ↑
+    //│               └─ メソッドの開始
+    //└─ 確認付き削除メソッド
+    
+      if (confirm('本当に削除しますか？')) {
+      //↑ ↑       ↑
+      //│ │       └─ 確認メッセージ
+      //│ └─ ブラウザの確認ダイアログ
+      //└─ 条件分岐（OKボタンでtrue）
+      
+        console.log('削除処理を実行します')
+        //↑       ↑   ↑
+        //│       │   └─ ログメッセージ
+        //│       └─ ログ出力メソッド
+        //└─ ブラウザのconsoleオブジェクト
+        
+        // 実際の削除処理をここに書く
+        alert('削除されました')
+        //↑   ↑
+        //│   └─ 完了メッセージ
+        //└─ ブラウザのアラート表示
+      }
+    }
+  }
+}
+</script>
+
+<style>
+.active {
+  /*↑
+    └─ アクティブ状態のCSSクラス */
+  
+  background-color: #4CAF50;
+  /*↑               ↑
+    │               └─ 緑色の背景
+    └─ 背景色プロパティ */
+    
+  color: white;
+  /*↑    ↑
+    │    └─ 白色のテキスト
+    └─ 文字色プロパティ */
+}
+
+button:disabled {
+  /*↑    ↑
+    │    └─ 疑似クラス（無効状態）
+    └─ button要素 */
+  
+  opacity: 0.5;
+  /*↑      ↑
+    │      └─ 半透明（50%）
+    └─ 透明度プロパティ */
+    
+  cursor: not-allowed;
+  /*↑     ↑
+    │     └─ 禁止カーソル
+    └─ カーソルプロパティ */
+}
+</style>
+```
+
+---
+
+## 📊 **@click パフォーマンス図解**
+
+```
+【@click の実行フロー】
+
+ユーザーがボタンをクリック
+         ↓
+ブラウザがclickイベントを発生
+         ↓
+Vue.js がイベントを検知
+         ↓
+@click="methodName" を解析
+         ↓
+該当するメソッドを実行
+         ↓
+メソッド内でデータ変更
+         ↓
+Vue.js がデータ変更を検知
+         ↓
+仮想DOMを再計算
+         ↓
+必要な部分のDOMを更新
+         ↓
+画面に変更が反映される
+
+【処理時間】
+クリック検知: ~1ms
+メソッド実行: 処理による
+DOM更新: ~16ms (60fps)
+```
+
+---
+
+## 🎯 **まとめ：@click マスターチェックリスト**
+
+### **✅ 基本パターン**
+- [ ] `@click="methodName"` - 引数なし
+- [ ] `@click="methodName(arg)"` - 引数あり
+- [ ] `@click="methodName($event)"` - イベント取得
+
+### **✅ 修飾子パターン**
+- [ ] `@click.prevent` - デフォルト動作防止
+- [ ] `@click.stop` - イベント伝播停止
+- [ ] `@click.once` - 一度だけ実行
+- [ ] `@click.self` - 自身のみ反応
+
+### **✅ 実用パターン**
+- [ ] 条件付きクリック処理
+- [ ] 配列操作（追加・削除・編集）
+- [ ] 非同期処理との組み合わせ
+- [ ] 確認ダイアログ付き処理
+
+### **✅ テストパターン**
+- [ ] クリックイベントのシミュレート
+- [ ] メソッド呼び出しの検証
+- [ ] 引数の正確性確認
+- [ ] DOM変更の確認
+
+**覚えておくべき重要ポイント：**
+1. `@click` は `v-on:click` の省略記法
+2. 引数なしの場合は `()` 不要
+3. 引数ありの場合は `()` 必須
+4. `$event` で元のイベントオブジェクト取得可能
+5. 修飾子で動作をカスタマイズ可能
+
+この解説をマスターすれば、Vue.jsでのクリックイベント処理は完璧です！
+
+ーーーーーーーーーーーーー
