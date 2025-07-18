@@ -1,0 +1,244 @@
+# Jestテスト文法解説
+
+## 基本構造
+
+### テストファイルの全体構造
+```javascript
+describe('テストスイート名', () => {
+  // テストの準備・初期化
+  beforeEach(() => {
+    // 各テスト前に実行される処理
+  })
+
+  afterEach(() => {
+    // 各テスト後に実行される処理
+  })
+
+  it('テストケース名', async () => {
+    // テスト実行内容
+    expect(actual).toBe(expected)
+  })
+})
+```
+
+## 主要なJest文法
+
+### 1. テスト構造の定義
+
+#### `describe()`
+- テストスイートをグループ化
+```javascript
+describe('ProductDetailSumame.vue', () => {
+  describe('保証内容エリア', () => {
+    // ネストしたテストグループ
+  })
+})
+```
+
+#### `it()` / `test()`
+- 個別のテストケースを定義
+```javascript
+it('ケース 1-1 入院給付金日額：表示（20歳）', async () => {
+  // テスト内容
+})
+```
+
+### 2. セットアップ・クリーンアップ
+
+#### `beforeEach()`
+```javascript
+beforeEach(() => {
+  // 各テスト前に実行
+  const dummyElements = {
+    sumameAccordionTarget: { style: { height: -1 } }
+  }
+  jest.spyOn(document, 'getElementById')
+    .mockImplementation((id) => dummyElements[id])
+})
+```
+
+#### `afterEach()`
+```javascript
+afterEach(() => {
+  // 各テスト後に実行
+  mockDate.mockRestore()
+})
+```
+
+### 3. Vue Test Utilsの使用
+
+#### コンポーネントのマウント
+```javascript
+const wrapper = mount(ProductDetailSumame, {
+  mocks: { $store },
+  propsData: {
+    application: getApplication(),
+    constants: getConstants()
+  }
+})
+```
+
+#### DOM要素の検索・操作
+```javascript
+// 要素の検索
+const elm = wrapper.find('select[name="product_02_01"]')
+const options = wrapper.findAll('option')
+
+// 要素の操作
+options.at(0).setSelected()
+await wrapper.vm.$nextTick()
+```
+
+### 4. アサーション（検証）
+
+#### 基本的なアサーション
+```javascript
+// 等価性の検証
+expect(value).toBe(expected)
+expect(value).not.toBe(unexpected)
+
+// 存在性の検証
+expect(element.exists()).toBe(true)
+expect(element.isVisible()).toBe(true)
+
+// 配列・オブジェクトの検証
+expect(array.length).toBe(5)
+expect(object.property).toMatch(/正規表現/)
+```
+
+#### テキスト内容の検証
+```javascript
+expect(elm.find('h6').text()).toBe('入院給付金日額')
+expect(elm.find('p').text()).toMatch(/入院給付金受取人/)
+```
+
+### 5. 非同期処理の扱い
+
+#### async/await
+```javascript
+it('非同期テスト', async () => {
+  await wrapper.vm.$nextTick()
+  await flushPromises()
+  
+  // アサーション
+  expect(result).toBe(expected)
+})
+```
+
+#### Promise処理
+```javascript
+await wrapper.vm.$nextTick()  // Vue の再描画を待つ
+await flushPromises()         // すべてのPromiseを待つ
+```
+
+### 6. モック（Mock）
+
+#### 関数のモック
+```javascript
+wrapper.vm.dispPerTimes = jest.fn()
+wrapper.vm.initDataSumame()
+```
+
+#### 日付のモック
+```javascript
+const mockDate = jest.spyOn(global, 'Date')
+mockDate.mockImplementation(arg1 => {
+  return arg1 ? new OriginalDate(arg1) : useDate
+})
+```
+
+### 7. カスタムヘルパー関数
+
+#### プルダウン操作のヘルパー
+```javascript
+const expectAmountChangeByPulldownItems = async (wrapper, pulldownItems, options, baseAmount) => {
+  let lastAmount = baseAmount
+  for (const option of options) {
+    const toBeSelected = pulldownItems.filter(node => node.text() == option)
+    toBeSelected.at(0).setSelected()
+    await wrapper.vm.$nextTick()
+    
+    const currentAmount = wrapper.vm.applicationValues.sumame
+    expect(currentAmount).not.toBe(lastAmount)
+    lastAmount = currentAmount
+  }
+  return lastAmount
+}
+```
+
+### 8. モーダルテスト
+
+#### モーダルの表示・非表示テスト
+```javascript
+// モーダル表示
+wrapper.find('.qa01').trigger('click')
+await wrapper.vm.$nextTick()
+
+const modal = wrapper.find('.modaal-wrapper')
+expect(modal.exists()).toBe(true)
+expect(modal.isVisible()).toBe(true)
+
+// モーダル閉じる
+wrapper.vm.closeModal()
+await flushPromises()
+```
+
+### 9. テストデータの管理
+
+#### ファクトリー関数
+```javascript
+const getApplication = () => {
+  const tmp = {
+    mainTypeCd: '206',
+    birthDate: '1999-1-1',
+    fullAge: 20,
+    gender: 1,
+    // ... 大量のテストデータ
+  }
+  return JSON.parse(JSON.stringify(tmp))  // ディープコピー
+}
+```
+
+## ベストプラクティス
+
+### 1. テストの独立性
+- 各テストは他のテストに依存しない
+- `beforeEach`で初期化、`afterEach`でクリーンアップ
+
+### 2. 分かりやすいテスト名
+```javascript
+it('ケース 1-1 入院給付金日額：表示（20歳）', async () => {
+  // 何をテストしているかが明確
+})
+```
+
+### 3. データ駆動テスト
+```javascript
+const testCases = [
+  { age: 20, options: ['3,000', '4,000', '5,000'] },
+  { age: 60, options: ['終身', '65歳払込満了'] }
+]
+
+testCases.forEach(({ age, options }) => {
+  it(`年齢${age}の場合`, () => {
+    // テスト実行
+  })
+})
+```
+
+### 4. 非同期処理の適切な待機
+```javascript
+// DOM更新を確実に待つ
+await wrapper.vm.$nextTick()
+await new Promise(resolve => setTimeout(resolve, 100))
+
+// 保険料計算を確実に実行
+if (wrapper.vm.calcSumame) await wrapper.vm.calcSumame()
+```
+
+## 注意点
+
+1. **非同期処理**: Vue.jsのリアクティブ更新は非同期なので、`$nextTick()`での待機が重要
+2. **ディープコピー**: テストデータは`JSON.parse(JSON.stringify())`でディープコピー
+3. **要素の存在確認**: `exists()`で存在を確認してから操作
+4. **モックの復元**: `afterEach`でモックを適切に復元
